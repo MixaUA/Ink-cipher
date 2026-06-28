@@ -48,14 +48,12 @@ video{position:absolute;top:0;left:0;z-index:1}
 .scan-line{position:absolute;left:10px;right:10px;height:2px;background:rgba(255,80,80,0.7);border-radius:1px;animation:scanmove 2s ease-in-out infinite;z-index:3;top:20px}
 @keyframes scanmove{0%,100%{top:20px}50%{top:290px}}
 
-/* Стили для слайдера контроля радиуса */
 .control-box{width:320px;display:flex;flex-direction:column;gap:4px;font-family:sans-serif;font-size:12px;color:#555}
-.control-box div{display:flex;justify-content:between}
+.control-box div{display:flex;justify-content:space-between}
 .control-box input[type=range]{width:100%;margin-top:4px}
 
-/* Стили терминала логов */
 .terminal-wrap{width:320px;background:#1e1e1e;border-radius:8px;padding:12px;box-shadow:inset 0 0 6px rgba(0,0,0,0.5);margin-top:10px}
-.terminal-head{display:flex;justify-content:between;align-items:center;margin-bottom:8px;color:#aaa;font-size:11px;font-family:sans-serif}
+.terminal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;color:#aaa;font-size:11px;font-family:sans-serif}
 .terminal-head span{font-weight:bold;letter-spacing:0.05em}
 .terminal-head div{display:flex;gap:6px}
 .terminal-head button{height:22px;padding:0 8px;font-size:10px;background:#333;color:#ccc;border:0.5px solid #555;border-radius:4px}
@@ -94,9 +92,9 @@ video{position:absolute;top:0;left:0;z-index:1}
   <div class="control-box">
     <div style="display:flex; justify-content:space-between">
       <span>Радіус сканування клякси:</span>
-      <span id="radiusVal" style="font-weight:bold">108</span>
+      <span id="radiusVal" style="font-weight:bold">104</span>
     </div>
-    <input type="range" id="radiusSlider" min="50" max="180" value="108" oninput="updateRadius(this.value)"/>
+    <input type="range" id="radiusSlider" min="50" max="180" value="104" oninput="updateRadius(this.value)"/>
   </div>
 
   <div class="row">
@@ -146,12 +144,12 @@ let DB = {
 
 /* ── Параметри символу ── */
 const W=480, H=480, CX=240, CY=240;
-const ANCHOR_R = 155;   // радіус якорів
-const ANCHOR_SIZE = 18; // радіус якоря (великий)
-const N_DATA = 16;      // кількість крапок даних
+const ANCHOR_R = 155;
+const ANCHOR_SIZE = 18;
+const N_DATA = 16;
 const ANCHOR_ANGLES = [90, 210, 330].map(d => d * Math.PI / 180);
 
-let currentCustomRadius = 108;
+let currentCustomRadius = 104;
 let lastLoggedId = null;
 
 function updateRadius(val) {
@@ -235,7 +233,6 @@ function inkFibers(ctx, cx, cy, r, rng) {
   ctx.restore();
 }
 
-/* ── Малювання відростка ── */
 function drawArm(ctx, cx, cy, angle, bit, rng) {
   const startR = 75 + rng() * 8;
   const endR   = bit === 1 ? 120 + rng() * 38 : 68 + rng() * 22;
@@ -464,7 +461,6 @@ function tryDecode(ctx, W, H) {
     return data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
   }
 
-  // 1. АДАПТИВНИЙ ПОРІГ
   let totalLum = 0;
   for (let i = 0; i < data.length; i += 16) { 
     totalLum += data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
@@ -530,18 +526,14 @@ function tryDecode(ctx, W, H) {
   const cx = (pa.x + pb.x + pc.x) / 3;
   const cy = (pa.y + pb.y + pc.y) / 3;
 
-  // 2. ДИНАМІЧНИЙ МАСШТАБ (Керується за допомогою повзунка)
   const d1 = dist(pa, pb), d2 = dist(pb, pc), d3 = dist(pa, pc);
   const currentTriangleSide = (d1 + d2 + d3) / 3;
-  const dataR = currentTriangleSide * (currentCustomRadius / 268.47);
 
   const topAnchor = [pa, pb, pc].reduce((best, p) => p.y < best.y ? p : best);
   const topAngle = Math.atan2(topAnchor.y - cy, topAnchor.x - cx);
   const rotation = topAngle - (-Math.PI / 2);
 
   ctx.clearRect(0, 0, W, H);
-
-  const bitThresh = avgLum * 0.94; 
 
   const bits = [];
   for (let i = 0; i < N_DATA; i++) {
@@ -555,27 +547,40 @@ function tryDecode(ctx, W, H) {
     });
     if (tooClose) { bits.push(0); continue; }
 
-    const px = cx + Math.cos(angle) * dataR;
-    const py = cy + Math.sin(angle) * dataR;
+    let isDark = false;
+    let targetX = cx + Math.cos(angle) * (currentTriangleSide * (currentCustomRadius / 268.47));
+    let targetY = cy + Math.sin(angle) * (currentTriangleSide * (currentCustomRadius / 268.47));
 
-    let sumLum = 0;
-    let samples = 0;
-    for (let dx = -1; dx <= 1; dx++) {
-      for (let dy = -1; dy <= 1; dy++) {
-        sumLum += lum(px + dx, py + dy);
-        samples++;
+    const minR = currentTriangleSide * ((currentCustomRadius - 20) / 268.47);
+    const maxR = currentTriangleSide * ((currentCustomRadius + 25) / 268.47);
+    const bitThresh = avgLum * 0.94;
+
+    for (let r = minR; r <= maxR; r += 3) {
+      const px = cx + Math.cos(angle) * r;
+      const py = cy + Math.sin(angle) * r;
+
+      let sumLum = 0;
+      let samples = 0;
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+          sumLum += lum(px + dx, py + dy);
+          samples++;
+        }
+      }
+      if ((sumLum / samples) < bitThresh) {
+        isDark = true;
+        targetX = px;
+        targetY = py;
+        break; 
       }
     }
-    const currentLum = sumLum / samples;
-    const isDark = currentLum < bitThresh; 
 
     if (isDark) bits.push(1);
     else bits.push(0);
 
-    // 3. НАКЛАДАННЯ ДЕБАГУ (Червона = 1, Зелена = 0)
     ctx.fillStyle = isDark ? '#ff0000' : '#00ff00';
     ctx.beginPath();
-    ctx.arc(px, py, 4, 0, Math.PI * 2);
+    ctx.arc(targetX, targetY, 4, 0, Math.PI * 2);
     ctx.fill();
   }
 
@@ -615,7 +620,7 @@ function setDecStatus(status, phrase) {
 
 function dist(a, b) { return Math.sqrt((a.x-b.x)**2+(a.y-b.y)**2); }
 
-/* ── Логування в термінал ── */
+/* ── Логування ── */
 function logMsg(msg) {
   const lb = document.getElementById('logBody');
   const time = new Date().toLocaleTimeString();
@@ -675,7 +680,6 @@ function switchTab(name) {
   if (name !== 'dec') stopCam();
 }
 
-/* ── Ініціалізація ── */
 renderDB();
 encode();
 </script>

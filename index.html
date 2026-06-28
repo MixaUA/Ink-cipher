@@ -47,6 +47,20 @@ video{position:absolute;top:0;left:0;z-index:1}
 #decCanvas{position:absolute;top:0;left:0;z-index:2;background:transparent;display:block;pointer-events:none}
 .scan-line{position:absolute;left:10px;right:10px;height:2px;background:rgba(255,80,80,0.7);border-radius:1px;animation:scanmove 2s ease-in-out infinite;z-index:3;top:20px}
 @keyframes scanmove{0%,100%{top:20px}50%{top:290px}}
+
+/* Стили для слайдера контроля радиуса */
+.control-box{width:320px;display:flex;flex-direction:column;gap:4px;font-family:sans-serif;font-size:12px;color:#555}
+.control-box div{display:flex;justify-content:between}
+.control-box input[type=range]{width:100%;margin-top:4px}
+
+/* Стили терминала логов */
+.terminal-wrap{width:320px;background:#1e1e1e;border-radius:8px;padding:12px;box-shadow:inset 0 0 6px rgba(0,0,0,0.5);margin-top:10px}
+.terminal-head{display:flex;justify-content:between;align-items:center;margin-bottom:8px;color:#aaa;font-size:11px;font-family:sans-serif}
+.terminal-head span{font-weight:bold;letter-spacing:0.05em}
+.terminal-head div{display:flex;gap:6px}
+.terminal-head button{height:22px;padding:0 8px;font-size:10px;background:#333;color:#ccc;border:0.5px solid #555;border-radius:4px}
+.terminal-head button:hover{background:#444;color:#fff}
+.terminal-body{font-family:monospace;font-size:11px;color:#00ff00;max-height:100px;overflow-y:auto;white-space:pre-wrap;line-height:1.4}
 </style>
 </head>
 <body>
@@ -76,12 +90,32 @@ video{position:absolute;top:0;left:0;z-index:1}
     <canvas id="decCanvas" width="320" height="320"></canvas>
     <div class="scan-line" id="scanLine" style="display:none"></div>
   </div>
+  
+  <div class="control-box">
+    <div style="display:flex; justify-content:space-between">
+      <span>Радіус сканування клякси:</span>
+      <span id="radiusVal" style="font-weight:bold">108</span>
+    </div>
+    <input type="range" id="radiusSlider" min="50" max="180" value="108" oninput="updateRadius(this.value)"/>
+  </div>
+
   <div class="row">
     <button class="primary" onclick="startCam()">Увімкнути камеру</button>
     <button onclick="stopCam()">Зупинити</button>
   </div>
   <div class="status" id="decStatus">Натисни «Увімкнути камеру» і наведи на символ</div>
   <div class="phrase-out" id="decPhrase"></div>
+
+  <div class="terminal-wrap">
+    <div class="terminal-head">
+      <span>LOG TERMINAL</span>
+      <div>
+        <button onclick="copyLog()">Копіювати</button>
+        <button onclick="clearLog()">Очистити</button>
+      </div>
+    </div>
+    <div class="terminal-body" id="logBody">--- Очікування запуску ---</div>
+  </div>
 </div>
 
 <div class="panel" id="tab-db">
@@ -102,7 +136,7 @@ let DB = {
   0:"Початок усього — тиша перед першим словом.",
   1:"Зірки пам'ятають кожну дитячу мрію.",
   7:"Ліс дихає разом з тобою, варто лише зупинитись.",
-  13:"Кожна крапля дощу несе свое ім'я.",
+  13:"Кожна крапля дощу несе своє ім'я.",
   42:"Відповідь на всі питання — справді сорок два!",
   99:"За горизонтом живуть дракони і добрі велетні.",
   256:"Магія криється у звичайних числах.",
@@ -113,14 +147,17 @@ let DB = {
 /* ── Параметри символу ── */
 const W=480, H=480, CX=240, CY=240;
 const ANCHOR_R = 155;   // радіус якорів
-const DATA_R   = 108;   // радіус крапок даних
 const ANCHOR_SIZE = 18; // радіус якоря (великий)
-const DOT_SIZE_1  = 11; // крапка = біт 1
-const DOT_SIZE_0  = 6;  // крапка = біт 0 (менша)
 const N_DATA = 16;      // кількість крапок даних
-
-// 3 якорі на 90°, 210°, 330° (рівнобедрений трикутник)
 const ANCHOR_ANGLES = [90, 210, 330].map(d => d * Math.PI / 180);
+
+let currentCustomRadius = 108;
+let lastLoggedId = null;
+
+function updateRadius(val) {
+  currentCustomRadius = parseInt(val);
+  document.getElementById('radiusVal').textContent = val;
+}
 
 /* ── PRNG ── */
 function mkRng(seed) {
@@ -386,11 +423,12 @@ async function startCam() {
     });
     video.srcObject = camStream;
     document.getElementById('scanLine').style.display = 'block';
-    document.getElementById('decStatus').textContent = 'Камера активна — шукаю символ...';
+    logMsg('Камеру активовано. Пошук якорів...');
     scanTimer = setInterval(scanFrame, 350);
   } catch(e) {
     document.getElementById('decStatus').className = 'status err';
     document.getElementById('decStatus').textContent = 'Помилка камери: ' + e.message;
+    logMsg('ERR: ' + e.message);
   }
 }
 
@@ -403,6 +441,7 @@ function stopCam() {
   const dc = document.getElementById('decCanvas');
   const ctx = dc.getContext('2d');
   ctx.clearRect(0, 0, dc.width, dc.height);
+  logMsg('Камеру зупинено.');
 }
 
 function scanFrame() {
@@ -410,8 +449,6 @@ function scanFrame() {
   if (!camStream || video.readyState < 2) return;
   const dc = document.getElementById('decCanvas');
   const ctx = dc.getContext('2d');
-  
-  // Беремо чистий кадр з відео
   ctx.drawImage(video, 0, 0, 320, 320);
   tryDecode(ctx, dc.width, dc.height);
 }
@@ -427,7 +464,7 @@ function tryDecode(ctx, W, H) {
     return data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
   }
 
-  // 1. АДАПТИВНИЙ ПОРІГ ЯСКРАВОСТІ
+  // 1. АДАПТИВНИЙ ПОРІГ
   let totalLum = 0;
   for (let i = 0; i < data.length; i += 16) { 
     totalLum += data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
@@ -459,7 +496,7 @@ function tryDecode(ctx, W, H) {
 
   darkBlobs.sort((a, b) => b.size - a.size);
   if (darkBlobs.length < 3) {
-    ctx.clearRect(0, 0, W, H); // Очищаємо дебаг-графіку, якщо символ пропав
+    ctx.clearRect(0, 0, W, H);
     setDecStatus('Шукаю символ...', '');
     return;
   }
@@ -493,19 +530,18 @@ function tryDecode(ctx, W, H) {
   const cx = (pa.x + pb.x + pc.x) / 3;
   const cy = (pa.y + pb.y + pc.y) / 3;
 
-  // 2. ДИНАМІЧНИЙ МАСШТАБ (Радіус зсунуто на 135 для точного попадання у тіло відростків)
+  // 2. ДИНАМІЧНИЙ МАСШТАБ (Керується за допомогою повзунка)
   const d1 = dist(pa, pb), d2 = dist(pb, pc), d3 = dist(pa, pc);
   const currentTriangleSide = (d1 + d2 + d3) / 3;
-  const dataR = currentTriangleSide * (135 / 268.47);
+  const dataR = currentTriangleSide * (currentCustomRadius / 268.47);
 
   const topAnchor = [pa, pb, pc].reduce((best, p) => p.y < best.y ? p : best);
   const topAngle = Math.atan2(topAnchor.y - cy, topAnchor.x - cx);
   const rotation = topAngle - (-Math.PI / 2);
 
-  // Очищаємо canvas, щоб накласти ЛИШЕ дебаг-маркери поверх прозорого фону відео
   ctx.clearRect(0, 0, W, H);
 
-  const bitThresh = avgLum * 0.92; 
+  const bitThresh = avgLum * 0.94; 
 
   const bits = [];
   for (let i = 0; i < N_DATA; i++) {
@@ -536,14 +572,13 @@ function tryDecode(ctx, W, H) {
     if (isDark) bits.push(1);
     else bits.push(0);
 
-    // 3. НАКЛАДАННЯ ДЕБАГУ НА ГОЛОВНИЙ ЕКРАН (Червона = 1, Зелена = 0)
+    // 3. НАКЛАДАННЯ ДЕБАГУ (Червона = 1, Зелена = 0)
     ctx.fillStyle = isDark ? '#ff0000' : '#00ff00';
     ctx.beginPath();
     ctx.arc(px, py, 4, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  // Малюємо сині лінії якорів безпосередньо поверх екрана
   ctx.strokeStyle = '#0000ff';
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -557,8 +592,16 @@ function tryDecode(ctx, W, H) {
   const phrase = DB[id];
   if (phrase) {
     setDecStatus(`✓ Розпізнано! ID: ${id}`, phrase);
+    if (lastLoggedId !== id) {
+      logMsg(`[OK] Зчитано ID: ${id} -> "${phrase.substring(0,20)}..."`);
+      lastLoggedId = id;
+    }
   } else {
     setDecStatus(`Зчитано ID: ${id} — немає у базі`, '');
+    if (lastLoggedId !== id && id !== 0) {
+      logMsg(`[WARN] Зчитано ID: ${id} (немає в базі)`);
+      lastLoggedId = id;
+    }
   }
 }
 
@@ -571,6 +614,27 @@ function setDecStatus(status, phrase) {
 }
 
 function dist(a, b) { return Math.sqrt((a.x-b.x)**2+(a.y-b.y)**2); }
+
+/* ── Логування в термінал ── */
+function logMsg(msg) {
+  const lb = document.getElementById('logBody');
+  const time = new Date().toLocaleTimeString();
+  if (lb.textContent.includes('--- Очікування запуску ---')) lb.textContent = '';
+  lb.textContent += `[${time}] ${msg}\n`;
+  lb.scrollTop = lb.scrollHeight;
+}
+
+function clearLog() {
+  document.getElementById('logBody').textContent = '';
+  lastLoggedId = null;
+}
+
+function copyLog() {
+  const txt = document.getElementById('logBody').textContent;
+  navigator.clipboard.writeText(txt).then(() => {
+    alert('Лог скопійовано у буфер!');
+  });
+}
 
 /* ── База фраз UI ── */
 function renderDB() {

@@ -267,10 +267,8 @@ function drawArm(ctx, cx, cy, angle, bit, rng) {
 
 /* ── Якір (маркер позиціювання) — органічна клякса фіксованого розміру ── */
 function drawAnchor(ctx, cx, cy, rng) {
-  // Зовнішня клякса — завжди темна, завжди ~ANCHOR_SIZE
   ctx.save();
   ctx.fillStyle = '#0a0a0a';
-  // Зовнішній контур фіксований — лише легкий wobble
   const n = 14;
   ctx.beginPath();
   for (let i = 0; i < n; i++) {
@@ -284,13 +282,11 @@ function drawAnchor(ctx, cx, cy, rng) {
   ctx.fill();
   inkSplash(ctx, cx, cy, ANCHOR_SIZE*1.6, rng);
 
-  // Внутрішнє світле ядро — маркер для алгоритму
   ctx.fillStyle = '#f8f5ee';
   ctx.beginPath();
   ctx.arc(cx, cy, ANCHOR_SIZE * 0.42, 0, Math.PI*2);
   ctx.fill();
 
-  // Центральна крапка
   ctx.fillStyle = '#0a0a0a';
   ctx.beginPath();
   ctx.arc(cx, cy, ANCHOR_SIZE * 0.16, 0, Math.PI*2);
@@ -307,18 +303,15 @@ function drawCore(ctx, rng) {
   inkFibers(ctx, CX, CY, 68, rng);
   inkSplash(ctx, CX, CY, 90, rng);
 
-  // Світлий проміжок
   ctx.fillStyle = '#f8f5ee';
   blobPath(ctx, CX, CY, 38, 20, rng);
   ctx.fill();
 
-  // Внутрішня темна клякса
   ctx.fillStyle = '#0a0a0a';
   blobPath(ctx, CX, CY, 20, 14, rng);
   ctx.fill();
   inkSplash(ctx, CX, CY, 28, rng);
 
-  // Світла крапля в центрі
   ctx.fillStyle = '#f8f5ee';
   ctx.beginPath();
   ctx.arc(CX, CY, 7 + rng()*2, 0, Math.PI*2);
@@ -337,16 +330,11 @@ function drawSymbol(id) {
   ctx.fillRect(0, 0, W, H);
   ctx.strokeStyle = '#0a0a0a';
 
-  /* Біти */
   const bits = [];
   for (let i = 15; i >= 0; i--) bits.push((id >> i) & 1);
 
-  /* Відростки — між якорями, рівномірно 16 штук */
-  // Якорі на 90°,210°,330° — відростки на решті кутів рівномірно
-  const usedAngles = new Set(ANCHOR_ANGLES.map(a => Math.round(a*100)));
   const armAngles = [];
   for (let i = 0; i < N_DATA; i++) {
-    // розподіляємо 16 відростків рівномірно, пропускаємо зони якорів (±15°)
     const a = (i / N_DATA) * Math.PI * 2 - Math.PI/2;
     const tooClose = ANCHOR_ANGLES.some(aa => {
       let diff = Math.abs(a - aa) % (Math.PI*2);
@@ -356,19 +344,16 @@ function drawSymbol(id) {
     armAngles.push({ angle: a, bit: bits[i], skip: tooClose });
   }
 
-  /* Малюємо відростки */
   for (const arm of armAngles) {
     if (!arm.skip) drawArm(ctx, CX, CY, arm.angle, arm.bit, mkRng(rng()*0xFFFF^arm.angle*1000|0));
   }
 
-  /* Якорі позиціювання */
   for (const aa of ANCHOR_ANGLES) {
     const ax = CX + Math.cos(aa) * ANCHOR_R;
     const ay = CY + Math.sin(aa) * ANCHOR_R;
     drawAnchor(ctx, ax, ay, mkRng(rng()*0xFFFF|0));
   }
 
-  /* Центральна клякса */
   drawCore(ctx, mkRng(id^0xCCCC));
 }
 
@@ -431,58 +416,65 @@ function tryDecode(ctx, W, H) {
   const img = ctx.getImageData(0, 0, W, H);
   const data = img.data;
 
+  // Активуємо відображення дебаг-полотна під відеопотоком
+  const dc = document.getElementById('decCanvas');
+  dc.style.display = 'block';
+
   function lum(x, y) {
     x = Math.round(x); y = Math.round(y);
-    if (x < 0||x >= W||y < 0||y >= H) return 255;
-    const i = (y*W+x)*4;
-    return data[i]*0.299 + data[i+1]*0.587 + data[i+2]*0.114;
+    if (x < 0 || x >= W || y < 0 || y >= H) return 255;
+    const i = (y * W + x) * 4;
+    return data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
   }
 
-  // Знаходимо темні кластери (якорі)
-  // Скануємо по сітці 8px — шукаємо темні зони
-  const darkBlobs = [];
-  const visited = new Uint8Array(W*H);
-  const THRESH = 80;
+  // 1. АДАПТИВНИЙ ПОРІГ ЯСКРАВОСТІ (відносно загального фону)
+  let totalLum = 0;
+  for (let i = 0; i < data.length; i += 16) { 
+    totalLum += data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+  }
+  const avgLum = totalLum / (data.length / 16);
+  const THRESH = Math.min(100, avgLum * 0.75); 
 
-  for (let y = 4; y < H-4; y += 4) {
-    for (let x = 4; x < W-4; x += 4) {
-      if (lum(x,y) < THRESH && !visited[y*W+x]) {
-        // BFS — знаходимо центр кластера
-        const queue = [[x,y]];
-        let sx=0,sy=0,cnt=0;
+  // Пошук темних зон
+  const darkBlobs = [];
+  const visited = new Uint8Array(W * H);
+
+  for (let y = 4; y < H - 4; y += 4) {
+    for (let x = 4; x < W - 4; x += 4) {
+      if (lum(x, y) < THRESH && !visited[y * W + x]) {
+        const queue = [[x, y]];
+        let sx = 0, sy = 0, cnt = 0;
         while (queue.length && cnt < 2000) {
-          const [cx,cy] = queue.shift();
-          if (cx<0||cx>=W||cy<0||cy>=H||visited[cy*W+cx]||lum(cx,cy)>=THRESH) continue;
-          visited[cy*W+cx]=1;
-          sx+=cx; sy+=cy; cnt++;
-          queue.push([cx+4,cy],[cx-4,cy],[cx,cy+4],[cx,cy-4]);
+          const [cx, cy] = queue.shift();
+          if (cx < 0 || cx >= W || cy < 0 || cy >= H || visited[cy * W + cx] || lum(cx, cy) >= THRESH) continue;
+          visited[cy * W + cx] = 1;
+          sx += cx; sy += cy; cnt++;
+          queue.push([cx + 4, cy], [cx - 4, cy], [cx, cy + 4], [cx, cy - 4]);
         }
         if (cnt > 8 && cnt < 2000) {
-          darkBlobs.push({ x: sx/cnt, y: sy/cnt, size: cnt });
+          darkBlobs.push({ x: sx / cnt, y: sy / cnt, size: cnt });
         }
       }
     }
   }
 
-  // Шукаємо 3 якорі — найбільші темні кластери приблизно рівного розміру
-  darkBlobs.sort((a,b) => b.size - a.size);
+  darkBlobs.sort((a, b) => b.size - a.size);
   if (darkBlobs.length < 3) {
     setDecStatus('Шукаю символ...', '');
     return;
   }
 
-  // Беремо топ-кандидати і шукаємо трійку що утворює рівносторонній трикутник
   const candidates = darkBlobs.slice(0, Math.min(12, darkBlobs.length));
   let bestTriangle = null, bestScore = Infinity;
 
   for (let a = 0; a < candidates.length; a++) {
-    for (let b = a+1; b < candidates.length; b++) {
-      for (let c = b+1; c < candidates.length; c++) {
+    for (let b = a + 1; b < candidates.length; b++) {
+      for (let c = b + 1; c < candidates.length; c++) {
         const pa = candidates[a], pb = candidates[b], pc = candidates[c];
-        const d1 = dist(pa,pb), d2 = dist(pb,pc), d3 = dist(pa,pc);
-        const avg = (d1+d2+d3)/3;
-        if (avg < 30) continue; // занадто маленький
-        const score = (Math.abs(d1-avg)+Math.abs(d2-avg)+Math.abs(d3-avg))/avg;
+        const d1 = dist(pa, pb), d2 = dist(pb, pc), d3 = dist(pa, pc);
+        const avg = (d1 + d2 + d3) / 3;
+        if (avg < 30) continue; 
+        const score = (Math.abs(d1 - avg) + Math.abs(d2 - avg) + Math.abs(d3 - avg)) / avg;
         if (score < bestScore && score < 0.28) {
           bestScore = score;
           bestTriangle = [pa, pb, pc];
@@ -497,59 +489,64 @@ function tryDecode(ctx, W, H) {
   }
 
   const [pa, pb, pc] = bestTriangle;
-  // Центр
-  const cx = (pa.x+pb.x+pc.x)/3;
-  const cy = (pa.y+pb.y+pc.y)/3;
+  const cx = (pa.x + pb.x + pc.x) / 3;
+  const cy = (pa.y + pb.y + pc.y) / 3;
 
-  // Радіус якорів від центру
-  const r1 = dist({x:cx,y:cy}, pa);
-  const r2 = dist({x:cx,y:cy}, pb);
-  const r3 = dist({x:cx,y:cy}, pc);
-  const anchorR = (r1+r2+r3)/3;
-  const dataR = anchorR * (DATA_R/ANCHOR_R);
+  // 2. МАСШТАБ (розрахунок відстані на основі поточної сторони трикутника)
+  const d1 = dist(pa, pb), d2 = dist(pb, pc), d3 = dist(pa, pc);
+  const currentTriangleSide = (d1 + d2 + d3) / 3;
+  // Ідеальна сторона кодера: ANCHOR_R * Math.sqrt(3) ≈ 155 * 1.73205 = 268.47
+  const dataR = currentTriangleSide * (108 / 268.47);
 
-  // Знаходимо кут першого якоря (найвищого — той що на 90° від центру, тобто найменший y)
-  const anchors = [pa,pb,pc].map(p => ({
-    p, angle: Math.atan2(p.y-cy, p.x-cx)
-  }));
-  anchors.sort((a,b) => a.angle - b.angle);
+  const topAnchor = [pa, pb, pc].reduce((best, p) => p.y < best.y ? p : best);
+  const topAngle = Math.atan2(topAnchor.y - cy, topAnchor.x - cx);
+  const rotation = topAngle - (-Math.PI / 2);
 
-  // Кут повороту — якір з найменшим y має бути на -90° (вгорі)
-  const topAnchor = [pa,pb,pc].reduce((best,p) => p.y < best.y ? p : best);
-  const topAngle = Math.atan2(topAnchor.y-cy, topAnchor.x-cx);
-  const rotation = topAngle - (-Math.PI/2);
+  // Перемальовуємо чистий кадр, щоб створювати дебаг-графіку поверх нього
+  ctx.putImageData(img, 0, 0);
 
-  // Читаємо 16 крапок даних
+  // Динамічний поріг для аналізу бітів
+  const centerLum = lum(cx, cy);
+  const bitThresh = (centerLum + avgLum) / 2; 
+
   const bits = [];
-  let dataIdx = 0;
   for (let i = 0; i < N_DATA; i++) {
-    const rawAngle = (i/N_DATA)*Math.PI*2 - Math.PI/2;
+    const rawAngle = (i / N_DATA) * Math.PI * 2 - Math.PI / 2;
     const angle = rawAngle + rotation;
-    // Пропускаємо зони якорів
+    
     const tooClose = ANCHOR_ANGLES.some(aa => {
-      let diff = Math.abs(rawAngle - aa) % (Math.PI*2);
-      if (diff > Math.PI) diff = Math.PI*2-diff;
+      let diff = Math.abs(rawAngle - aa) % (Math.PI * 2);
+      if (diff > Math.PI) diff = Math.PI * 2 - diff;
       return diff < 0.28;
     });
     if (tooClose) { bits.push(0); continue; }
 
-    // Зразок пікселів у цій зоні
-    let dark = 0, total = 0;
-    for (let dr = -DOT_SIZE_1; dr <= DOT_SIZE_1; dr += 3) {
-      for (let da = -0.12; da <= 0.12; da += 0.06) {
-        const r = dataR + dr;
-        const px = cx + Math.cos(angle+da)*r;
-        const py = cy + Math.sin(angle+da)*r;
-        const l = lum(px, py);
-        if (l < 110) dark++;
-        total++;
-      }
-    }
-    bits.push(dark/total > 0.35 ? 1 : 0);
+    const px = cx + Math.cos(angle) * dataR;
+    const py = cy + Math.sin(angle) * dataR;
+    
+    const l = lum(px, py);
+    const isDark = l < bitThresh * 0.88; 
+
+    if (isDark) bits.push(1);
+    else bits.push(0);
+
+    // 3. ДЕБАГ РЕЖИМ (Малюємо точки зчитування: Червона = 1, Зелена = 0)
+    ctx.fillStyle = isDark ? '#ff0000' : '#00ff00';
+    ctx.beginPath();
+    ctx.arc(px, py, 4, 0, Math.PI * 2);
+    ctx.fill();
   }
 
+  // Малюємо сині лінії зв'язку між знайденими якорями
+  ctx.strokeStyle = '#0000ff';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y);
+  ctx.lineTo(pc.x, pc.y); ctx.closePath();
+  ctx.stroke();
+
   let id = 0;
-  for (let i = 0; i < 16; i++) id = (id<<1)|bits[i];
+  for (let i = 0; i < 16; i++) id = (id << 1) | bits[i];
 
   const phrase = DB[id];
   if (phrase) {

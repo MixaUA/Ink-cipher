@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Ink Cipher: Pattern Filter Wave</title>
+<title>Ink Cipher: Dynamic Base Fix</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#f0ede4;font-family:Georgia,serif;min-height:100vh}
@@ -59,7 +59,7 @@ video{position:absolute;top:0;left:0;z-index:1}
 </head>
 <body>
 <h1>✦ Ink Cipher ✦</h1>
-<p class="subtitle">Аналітичний фільтр патернів: валідація 3 з 5 кадрів (Індекс 0–573)</p>
+<p class="subtitle" id="mainSub">Калібрування бази кодів...</p>
 
 <div class="tabs">
   <div class="tab active" onclick="switchTab('enc')">Кодер</div>
@@ -70,7 +70,7 @@ video{position:absolute;top:0;left:0;z-index:1}
 <div class="panel active" id="tab-enc">
   <canvas id="encCanvas" width="480" height="480"></canvas>
   <div class="row">
-    <input type="number" id="encId" value="42" min="0" max="573" placeholder="Номер фрази 0–573"/>
+    <input type="number" id="encId" value="42" min="0" max="100" placeholder="ID фрази"/>
     <button class="primary" onclick="encode()">Намалювати Блоба</button>
     <button onclick="downloadPNG()">Зберегти PNG</button>
   </div>
@@ -86,7 +86,7 @@ video{position:absolute;top:0;left:0;z-index:1}
   </div>
 
   <div class="row" style="margin-top:10px">
-    <button class="primary" onclick="startCam()">Увімкнути радар</button>
+    <button class="primary" onclick="startCam()">Увімкенути радар</button>
     <button onclick="stopCam()">Зупинити</button>
   </div>
   <div class="status" id="decStatus">Очікування запуска...</div>
@@ -106,10 +106,10 @@ video{position:absolute;top:0;left:0;z-index:1}
 
 <div class="panel" id="tab-db">
   <div class="db-wrap">
-    <h3>БАЗА ФРАЗ (Дозволені індекси 0 – 573)</h3>
+    <h3 id="dbTitle">БАЗА ФРАЗ</h3>
     <div class="db-list" id="dbList"></div>
     <div class="add-row">
-      <input type="number" id="newId" placeholder="Індекс 0-573" min="0" max="573"/>
+      <input type="number" id="newId" placeholder="ID" min="0" max="100"/>
       <input type="text" id="newPhrase" placeholder="Текст магічної фрази..."/>
       <button onclick="addEntry()">Додати</button>
     </div>
@@ -121,10 +121,9 @@ let DB = {
   0: "Початок усього — тиша перед першим словом.",
   7: "Ліс дихає разом з тобою, варто лише зупинитись.",
   13: "Кожна крапля дощу несе своє таємне ім'я.",
-  42: "Відповідь на всі питання Всесвіту знайшлася v кляксі!",
+  42: "Відповідь на всі питання Всесвіту знайшлася в кляксі!",
   43: "Магія криється в деталях, які ніхто не помічає.",
-  44: "Шляхетна структура хвиль тримає інформаційне поле.",
-  573: "Остання сторінка чарівної книги секторних хвиль."
+  44: "Шляхетна структура хвиль тримає інформаційне поле."
 };
 
 const W=480, H=480, CX=240, CY=240;
@@ -134,11 +133,9 @@ const N_DATA = 12;
 const START_ANGLE = Math.PI / 2; 
 
 let lastLoggedId = null;
-
-// Змінні фільтрації та утримання
 let lockIndex = null;
 let lockClearTimeout = null;
-let scanHistory = []; // Буфер останніх розпізнаних індексів
+let scanHistory = [];
 
 const VALID_CODES = [];
 function initValidCodes() {
@@ -158,6 +155,13 @@ function initValidCodes() {
     }
     if (!hasTriple) VALID_CODES.push(code);
   }
+
+  // Динамічне підлаштування лімітів під фактичну довжину масиву
+  const maxIdx = VALID_CODES.length - 1;
+  document.getElementById('mainSub').textContent = `Ковзне вікно патернів 3 з 8 (Доступні індекси: 0–${maxIdx})`;
+  document.getElementById('dbTitle').textContent = `БАЗА ФРАЗ (Дозволені індекси 0 – ${maxIdx})`;
+  document.getElementById('encId').max = maxIdx;
+  document.getElementById('newId').max = maxIdx;
 }
 initValidCodes();
 
@@ -244,8 +248,10 @@ function drawSymbol(dbIndex) {
   ctx.fillStyle = '#f8f5ee';
   ctx.fillRect(0, 0, W, H);
 
-  drawHeroBody(ctx, bitCode);
-  drawHeroEyes(ctx);
+  if (bitCode !== undefined) {
+    drawHeroBody(ctx, bitCode);
+    drawHeroEyes(ctx);
+  }
 
   const angles = [90, 210, 330].map(d => d * Math.PI / 180);
   for (let i = 0; i < angles.length; i++) {
@@ -254,14 +260,16 @@ function drawSymbol(dbIndex) {
 }
 
 function encode() {
-  const idx = Math.max(0, Math.min(573, parseInt(document.getElementById('encId').value)||0));
+  const maxLimit = VALID_CODES.length - 1;
+  const idx = Math.max(0, Math.min(maxLimit, parseInt(document.getElementById('encId').value)||0));
   drawSymbol(idx);
   
   const bitCode = VALID_CODES[idx];
   const bits = [];
-  for (let i = 11; i >= 0; i--) bits.push((bitCode >> i) & 1);
-  
-  document.getElementById('encInfo').textContent = `Індекс: ${idx} / 573  ·  Бортовий код: ${bitCode}  ·  (${bits.slice(0,6).join('')} ${bits.slice(6).join('')})`;
+  if (bitCode !== undefined) {
+    for (let i = 11; i >= 0; i--) bits.push((bitCode >> i) & 1);
+    document.getElementById('encInfo').textContent = `Індекс: ${idx} / ${maxLimit}  ·  Бортовий код: ${bitCode}  ·  (${bits.slice(0,6).join('')} ${bits.slice(6).join('')})`;
+  }
   const p = DB[idx];
   document.getElementById('encPhrase').textContent = p ? `"${p}"` : '(немає у вазі)';
 }
@@ -269,12 +277,11 @@ function encode() {
 function downloadPNG() {
   const idx = document.getElementById('encId').value || '0';
   const a = document.createElement('a');
-  a.download = `ink-pattern-wave-${idx}.png`;
+  a.download = `ink-dynamic-wave-${idx}.png`;
   a.href = document.getElementById('encCanvas').toDataURL('image/png');
   a.click();
 }
 
-/* ── ДЕКОДЕР З АНАЛІЗОМ ІСТОРІЇ ПАТЕРНІВ ── */
 let camStream = null, scanTimer = null;
 
 async function startCam() {
@@ -437,41 +444,40 @@ function tryDecode(ctx, W, H) {
   const finalDbIndex = VALID_CODES.indexOf(currentBitCode);
 
   if (finalDbIndex !== -1) {
-    // 1. Записуємо знайдений індекс в історію хвиль
     scanHistory.push(finalDbIndex);
-    if (scanHistory.length > 5) scanHistory.shift(); // Тримаємо вікно з 5 кадрів
+  } else {
+    scanHistory.push(-1);
+  }
+  
+  if (scanHistory.length > 8) scanHistory.shift();
 
-    // 2. Підраховуємо частоту появи індексів у вікні
-    const counts = {};
-    let patternWinner = null;
-    for (const id of scanHistory) {
+  const counts = {};
+  let patternWinner = null;
+  for (const id of scanHistory) {
+    if (id !== -1) {
       counts[id] = (counts[id] || 0) + 1;
-      if (counts[id] >= 3) { // ПАТЕРН ЗНАЙДЕНО: 3 збіги серед сміття!
+      if (counts[id] >= 3) {
         patternWinner = id;
       }
     }
+  }
 
-    if (patternWinner !== null) {
-      lockIndex = patternWinner;
-      if (lockClearTimeout) clearTimeout(lockClearTimeout);
-      lockClearTimeout = setTimeout(() => {
-        lockIndex = null;
-      }, 5000); // Утримання на 5 секунд
+  if (patternWinner !== null) {
+    lockIndex = patternWinner;
+    if (lockClearTimeout) clearTimeout(lockClearTimeout);
+    lockClearTimeout = setTimeout(() => { lockIndex = null; }, 5000);
+  }
 
-      // Очищаємо історію після успішного утримання, щоб не спамити підтвердженнями
-      scanHistory = [];
-    }
-
-    updateInterfaceStatus(`Зчитування сигналу... (Код: ${currentBitCode})`, DB[finalDbIndex] || '');
-    
+  if (finalDbIndex !== -1) {
+    updateInterfaceStatus(`Зчитування сигналу...`, DB[finalDbIndex] || '');
     if (lastLoggedId !== finalDbIndex) {
-      logMsg(`[SCAN] Знайдено Індекс: ${finalDbIndex} | Історія вікна: [${scanHistory.join(', ')}]`);
+      logMsg(`[SCAN] Знайдено Індекс: ${finalDbIndex} | Вікно: [${scanHistory.map(x=>x===-1?'_':x).join(', ')}]`);
       lastLoggedId = finalDbIndex;
     }
   } else {
     updateInterfaceStatus(`Пошук хвилі (код: ${currentBitCode})...`, '');
     if (lastLoggedId !== currentBitCode && currentBitCode !== 0) {
-      logMsg(`[DROSS] Сирий шум: ${currentBitCode}`);
+      logMsg(`[DROSS] Сирий шум: ${currentBitCode} | Вікно: [${scanHistory.map(x=>x===-1?'_':x).join(', ')}]`);
       lastLoggedId = currentBitCode;
     }
   }
@@ -518,9 +524,10 @@ function renderDB() {
 }
 
 function addEntry() {
+  const maxLimit = VALID_CODES.length - 1;
   const id = parseInt(document.getElementById('newId').value);
   const phrase = document.getElementById('newPhrase').value.trim();
-  if (isNaN(id)||id<0||id>573||!phrase) return;
+  if (isNaN(id)||id<0||id>maxLimit||!phrase) return;
   DB[id] = phrase;
   document.getElementById('newId').value = '';
   document.getElementById('newPhrase').value = '';

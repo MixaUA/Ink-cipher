@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Ink Cipher: Restored Solid Wave</title>
+<title>Ink Cipher: Pattern Filter Wave</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#f0ede4;font-family:Georgia,serif;min-height:100vh}
@@ -26,9 +26,9 @@ button:hover{background:#ede9e0}
 button.primary{background:#1a1a1a;color:#f8f5ee;border-color:#1a1a1a}
 button.primary:hover{background:#333}
 .info{font-size:12px;color:#999;font-family:monospace;text-align:center}
-.phrase-out{font-size:17px;color:#1a1a1a;text-align:center;font-style:italic;min-height:26px;max-width:500px;line-height:1.6}
+.phrase-out{font-size:17px;color:#1a1a1a;text-align:center;font-style:italic;min-height:52px;max-width:500px;line-height:1.6;padding:0 10px}
 .status{font-size:13px;font-family:sans-serif;text-align:center;min-height:20px;color:#666}
-.status.ok{color:#2a7a2a}
+.status.ok{color:#2a7a2a;font-weight:bold}
 .status.err{color:#a02020}
 video{border-radius:12px;width:320px;height:320px;object-fit:cover;background:#111}
 .db-wrap{width:100%;max-width:560px;background:#fff;border-radius:12px;border:0.5px solid #ddd;padding:16px}
@@ -59,7 +59,7 @@ video{position:absolute;top:0;left:0;z-index:1}
 </head>
 <body>
 <h1>✦ Ink Cipher ✦</h1>
-<p class="subtitle">Відновлена Стабільна Хвиля — Без брудних бризок (Індекс 0–573)</p>
+<p class="subtitle">Аналітичний фільтр патернів: валідація 3 з 5 кадрів (Індекс 0–573)</p>
 
 <div class="tabs">
   <div class="tab active" onclick="switchTab('enc')">Кодер</div>
@@ -121,8 +121,9 @@ let DB = {
   0: "Початок усього — тиша перед першим словом.",
   7: "Ліс дихає разом з тобою, варто лише зупинитись.",
   13: "Кожна крапля дощу несе своє таємне ім'я.",
-  42: "Відповідь на всі питання Всесвіту знайшлася в кляксі!",
-  100: "Магія криється v деталях, які ніхто не помічає.",
+  42: "Відповідь на всі питання Всесвіту знайшлася v кляксі!",
+  43: "Магія криється в деталях, які ніхто не помічає.",
+  44: "Шляхетна структура хвиль тримає інформаційне поле.",
   573: "Остання сторінка чарівної книги секторних хвиль."
 };
 
@@ -133,6 +134,11 @@ const N_DATA = 12;
 const START_ANGLE = Math.PI / 2; 
 
 let lastLoggedId = null;
+
+// Змінні фільтрації та утримання
+let lockIndex = null;
+let lockClearTimeout = null;
+let scanHistory = []; // Буфер останніх розпізнаних індексів
 
 const VALID_CODES = [];
 function initValidCodes() {
@@ -155,7 +161,6 @@ function initValidCodes() {
 }
 initValidCodes();
 
-/* ── ВІДНОВЛЕНА СТАБІЛЬНА ГЕОМЕТРІЯ 180 ТОЧОК ── */
 function drawHeroBody(ctx, bitCode) {
   const bits = [];
   for (let i = 11; i >= 0; i--) bits.push((bitCode >> i) & 1);
@@ -173,14 +178,11 @@ function drawHeroBody(ctx, bitCode) {
     const idx2 = (idx1 + 1) % 12;
     const t = sectorFloat - Math.floor(sectorFloat);
 
-    // Повертаємо залізобетонні перевірені амплітуди для чіткого сканування
     const amp1 = bits[idx1] === 1 ? 22 : -12;
     const amp2 = bits[idx2] === 1 ? 22 : -12;
 
     const mu = (1 - Math.cos(t * Math.PI)) / 2;
     const currentRadius = baseCircleR + (amp1 * (1 - mu) + amp2 * mu);
-
-    // Легкий органічний мікрошум по контуру без деформації великої геометрії
     const organicNoise = Math.sin(angleFromStart * 6) * 1.5;
 
     points.push({
@@ -213,14 +215,23 @@ function drawHeroEyes(ctx) {
   ctx.restore();
 }
 
-function drawAnchor(ctx, cx, cy) {
+function drawAnchor(ctx, cx, cy, seedAngle) {
   ctx.save();
   ctx.fillStyle = '#0a0a0a';
+  const sprayCount = 4;
+  for (let i = 0; i < sprayCount; i++) {
+    const a = seedAngle + (i * (Math.PI * 2 / sprayCount)) + 0.3;
+    const dist = ANCHOR_SIZE * (1.1 + (i % 2) * 0.3);
+    const splashX = cx + Math.cos(a) * dist;
+    const splashY = cy + Math.sin(a) * dist;
+    const splashR = 2.5 + (i % 3);
+    ctx.beginPath(); ctx.arc(splashX, splashY, splashR, 0, Math.PI * 2); ctx.fill();
+  }
   ctx.beginPath(); ctx.arc(cx, cy, ANCHOR_SIZE, 0, Math.PI*2); ctx.fill();
   ctx.fillStyle = '#f8f5ee';
-  ctx.beginPath(); ctx.arc(cx, cy, ANCHOR_SIZE * 0.4, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx, cy, ANCHOR_SIZE * 0.45, 0, Math.PI*2); ctx.fill();
   ctx.fillStyle = '#0a0a0a';
-  ctx.beginPath(); ctx.arc(cx, cy, ANCHOR_SIZE * 0.15, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx, cy, ANCHOR_SIZE * 0.18, 0, Math.PI*2); ctx.fill();
   ctx.restore();
 }
 
@@ -237,8 +248,8 @@ function drawSymbol(dbIndex) {
   drawHeroEyes(ctx);
 
   const angles = [90, 210, 330].map(d => d * Math.PI / 180);
-  for (const a of angles) {
-    drawAnchor(ctx, CX + Math.cos(a)*ANCHOR_R, CY + Math.sin(a)*ANCHOR_R);
+  for (let i = 0; i < angles.length; i++) {
+    drawAnchor(ctx, CX + Math.cos(angles[i])*ANCHOR_R, CY + Math.sin(angles[i])*ANCHOR_R, angles[i]);
   }
 }
 
@@ -258,12 +269,12 @@ function encode() {
 function downloadPNG() {
   const idx = document.getElementById('encId').value || '0';
   const a = document.createElement('a');
-  a.download = `ink-restored-wave-${idx}.png`;
+  a.download = `ink-pattern-wave-${idx}.png`;
   a.href = document.getElementById('encCanvas').toDataURL('image/png');
   a.click();
 }
 
-/* ── ДЕКОДЕР З КУТОВИМ ЗСУВОМ 15 ГРАДУСІВ ── */
+/* ── ДЕКОДЕР З АНАЛІЗОМ ІСТОРІЇ ПАТЕРНІВ ── */
 let camStream = null, scanTimer = null;
 
 async function startCam() {
@@ -340,7 +351,7 @@ function tryDecode(ctx, W, H) {
   darkBlobs.sort((a, b) => b.size - a.size);
   if (darkBlobs.length < 3) {
     ctx.clearRect(0, 0, W, H);
-    setDecStatus('Ловлю фокус на 3 якорях...', '');
+    updateInterfaceStatus('Ловлю фокус на 3 якорях...', '');
     return;
   }
 
@@ -365,7 +376,7 @@ function tryDecode(ctx, W, H) {
 
   if (!bestTriangle) {
     ctx.clearRect(0, 0, W, H);
-    setDecStatus('Стабілізація геометрії трикутника...', '');
+    updateInterfaceStatus('Стабілізація геометрії трикутника...', '');
     return;
   }
 
@@ -384,7 +395,7 @@ function tryDecode(ctx, W, H) {
   ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.lineTo(pc.x, pc.y); ctx.closePath(); ctx.stroke();
 
   const radarCircleR = baseSide * (116 / 310); 
-  const baseCircleR  = baseSide * (75 / 310); // Еталонне вписане коло
+  const baseCircleR  = baseSide * (75 / 310); 
 
   let currentBitCode = 0;
   const HALF_SECTOR = (15 * Math.PI) / 180;
@@ -426,27 +437,59 @@ function tryDecode(ctx, W, H) {
   const finalDbIndex = VALID_CODES.indexOf(currentBitCode);
 
   if (finalDbIndex !== -1) {
-    const phrase = DB[finalDbIndex];
-    setDecStatus(`✓ ВЛУЧЕННЯ! Фраза #${finalDbIndex}`, phrase);
+    // 1. Записуємо знайдений індекс в історію хвиль
+    scanHistory.push(finalDbIndex);
+    if (scanHistory.length > 5) scanHistory.shift(); // Тримаємо вікно з 5 кадрів
+
+    // 2. Підраховуємо частоту появи індексів у вікні
+    const counts = {};
+    let patternWinner = null;
+    for (const id of scanHistory) {
+      counts[id] = (counts[id] || 0) + 1;
+      if (counts[id] >= 3) { // ПАТЕРН ЗНАЙДЕНО: 3 збіги серед сміття!
+        patternWinner = id;
+      }
+    }
+
+    if (patternWinner !== null) {
+      lockIndex = patternWinner;
+      if (lockClearTimeout) clearTimeout(lockClearTimeout);
+      lockClearTimeout = setTimeout(() => {
+        lockIndex = null;
+      }, 5000); // Утримання на 5 секунд
+
+      // Очищаємо історію після успішного утримання, щоб не спамити підтвердженнями
+      scanHistory = [];
+    }
+
+    updateInterfaceStatus(`Зчитування сигналу... (Код: ${currentBitCode})`, DB[finalDbIndex] || '');
+    
     if (lastLoggedId !== finalDbIndex) {
-      logMsg(`[SUCCESS] Знайдено Індекс: ${finalDbIndex} (Код: ${currentBitCode}) -> "${phrase || 'Без тексту'}"`);
+      logMsg(`[SCAN] Знайдено Індекс: ${finalDbIndex} | Історія вікна: [${scanHistory.join(', ')}]`);
       lastLoggedId = finalDbIndex;
     }
   } else {
-    setDecStatus(`Пошук хвилі (код: ${currentBitCode})...`, '');
+    updateInterfaceStatus(`Пошук хвилі (код: ${currentBitCode})...`, '');
     if (lastLoggedId !== currentBitCode && currentBitCode !== 0) {
-      logMsg(`[SCAN] Спроба розпізнати сирий код: ${currentBitCode}`);
+      logMsg(`[DROSS] Сирий шум: ${currentBitCode}`);
       lastLoggedId = currentBitCode;
     }
   }
 }
 
-function setDecStatus(status, phrase) {
+function updateInterfaceStatus(statusText, scannedPhrase) {
   const st = document.getElementById('decStatus');
   const ph = document.getElementById('decPhrase');
-  st.className = phrase ? 'status ok' : 'status';
-  st.textContent = status;
-  ph.textContent = phrase ? `"${phrase}"` : '';
+
+  if (lockIndex !== null && DB[lockIndex]) {
+    st.className = 'status ok';
+    st.textContent = `✓ ПАТЕРН ЗАФІКСОВАНО! Фраза #${lockIndex} (Утримання 5с)`;
+    ph.textContent = `"${DB[lockIndex]}"`;
+  } else {
+    st.className = scannedPhrase ? 'status ok' : 'status';
+    st.textContent = statusText;
+    ph.textContent = scannedPhrase ? `"${scannedPhrase}"` : '';
+  }
 }
 
 function dist(a, b) { return Math.sqrt((a.x-b.x)**2+(a.y-b.y)**2); }
@@ -459,7 +502,7 @@ function logMsg(msg) {
   lb.scrollTop = lb.scrollHeight;
 }
 
-function clearLog() { document.getElementById('logBody').textContent = ''; lastLoggedId = null; }
+function clearLog() { document.getElementById('logBody').textContent = ''; lastLoggedId = null; scanHistory = []; }
 function copyLog() { navigator.clipboard.writeText(document.getElementById('logBody').textContent).then(() => alert('Лог скопійовано!')); }
 
 function renderDB() {

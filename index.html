@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Ink Cipher: Autonomous Lock</title>
+<title>Ink Cipher: Modular Rune Edition</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#f0ede4;font-family:Georgia,serif;min-height:100vh}
@@ -71,7 +71,8 @@ video{position:absolute;top:0;left:0;z-index:1}
   <canvas id="encCanvas" width="480" height="480"></canvas>
   <div class="row">
     <input type="number" id="encId" value="42" min="0" placeholder="ID фрази"/>
-    <button class="primary" onclick="encode()">Намалювати Блоба</button>
+    <button class="primary" onclick="encode()">Намалювати Руну</button>
+    <button onclick="downloadSVG()">Скачати SVG</button>
     <button onclick="downloadPNG()">Зберегти PNG</button>
   </div>
   <div class="info" id="encInfo"></div>
@@ -128,9 +129,10 @@ let DB = {
 
 const W=480, H=480, CX=240, CY=240;
 const ANCHOR_R = 155; 
-const ANCHOR_SIZE = 14;
+const ANCHOR_SIZE = 18; // Збільшено до 18 для залізобетонного фокусування камери
 const N_DATA = 12; 
 const START_ANGLE = Math.PI / 2; 
+const BASE_R = 66; // Наша центральна відправна точка
 
 let lastLoggedId = null;
 let lockIndex = null;
@@ -164,77 +166,52 @@ function initValidCodes() {
 }
 initValidCodes();
 
-function drawHeroBody(ctx, bitCode) {
+// Малювання строгої модулярної архітектури Блоба-руни за секторами
+function generateRunePoints(bitCode) {
   const bits = [];
   for (let i = 11; i >= 0; i--) bits.push((bitCode >> i) & 1);
 
-  const baseCircleR = 66; 
-  const totalPoints = 180;
+  const totalPoints = 360; 
   const points = [];
 
   for (let p = 0; p < totalPoints; p++) {
     const angleFromStart = (p / totalPoints) * Math.PI * 2;
     const globalAngle = START_ANGLE + angleFromStart;
 
-    const sectorFloat = (angleFromStart / (Math.PI * 2)) * N_DATA - 0.5;
-    const idx1 = (Math.floor(sectorFloat) + 12) % 12;
-    const idx2 = (idx1 + 1) % 12;
-    const t = sectorFloat - Math.floor(sectorFloat);
+    // Визначаємо точний сектор від 0 до 11
+    const sector = Math.floor((angleFromStart / (Math.PI * 2)) * N_DATA) % 12;
+    const bit = bits[sector];
 
-    const amp1 = bits[idx1] === 1 ? 22 : -12;
-    const amp2 = bits[idx2] === 1 ? 22 : -12;
-
-    const mu = (1 - Math.cos(t * Math.PI)) / 2;
-    const currentRadius = baseCircleR + (amp1 * (1 - mu) + amp2 * mu);
-    const organicNoise = Math.sin(angleFromStart * 6) * 1.5;
+    // Модулярний радіус: +14 для одиниці, -14 для нуля від базового кола 66
+    const currentRadius = bit === 1 ? (BASE_R + 14) : (BASE_R - 14);
 
     points.push({
-      x: CX + Math.cos(globalAngle) * (currentRadius + organicNoise),
-      y: CY + Math.sin(globalAngle) * (currentRadius + organicNoise)
+      x: CX + Math.cos(globalAngle) * currentRadius,
+      y: CY + Math.sin(globalAngle) * currentRadius
     });
   }
+  return points;
+}
+
+function drawHeroBody(ctx, bitCode) {
+  const points = generateRunePoints(bitCode);
 
   ctx.save();
   ctx.fillStyle = '#0a0a0a';
   ctx.beginPath();
   ctx.moveTo(points[0].x, points[0].y);
-  for (let i = 1; i < totalPoints; i++) ctx.lineTo(points[i].x, points[i].y);
+  for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
   ctx.closePath();
   ctx.fill();
   ctx.restore();
 }
 
-function drawHeroEyes(ctx) {
-  ctx.save();
-  const eyeSpacing = 11;
-  const lx = CX - eyeSpacing, rx = CX + eyeSpacing;
-  const ly = CY - 4, ry = CY - 4;
-  ctx.fillStyle = '#f8f5ee';
-  ctx.beginPath(); ctx.arc(lx, ly, 6, 0, Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.arc(rx, ry, 6, 0, Math.PI*2); ctx.fill();
-  ctx.fillStyle = '#0a0a0a';
-  ctx.beginPath(); ctx.arc(lx, ly, 2.8, 0, Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.arc(rx, ry, 2.8, 0, Math.PI*2); ctx.fill();
-  ctx.restore();
-}
-
-function drawAnchor(ctx, cx, cy, seedAngle) {
+function drawAnchor(ctx, cx, cy) {
   ctx.save();
   ctx.fillStyle = '#0a0a0a';
-  const sprayCount = 4;
-  for (let i = 0; i < sprayCount; i++) {
-    const a = seedAngle + (i * (Math.PI * 2 / sprayCount)) + 0.3;
-    const dist = ANCHOR_SIZE * (1.1 + (i % 2) * 0.3);
-    const splashX = cx + Math.cos(a) * dist;
-    const splashY = cy + Math.sin(a) * dist;
-    const splashR = 2.5 + (i % 3);
-    ctx.beginPath(); ctx.arc(splashX, splashY, splashR, 0, Math.PI * 2); ctx.fill();
-  }
-  ctx.beginPath(); ctx.arc(cx, cy, ANCHOR_SIZE, 0, Math.PI*2); ctx.fill();
-  ctx.fillStyle = '#f8f5ee';
-  ctx.beginPath(); ctx.arc(cx, cy, ANCHOR_SIZE * 0.45, 0, Math.PI*2); ctx.fill();
-  ctx.fillStyle = '#0a0a0a';
-  ctx.beginPath(); ctx.arc(cx, cy, ANCHOR_SIZE * 0.18, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); 
+  ctx.arc(cx, cy, ANCHOR_SIZE, 0, Math.PI * 2); 
+  ctx.fill();
   ctx.restore();
 }
 
@@ -249,12 +226,11 @@ function drawSymbol(dbIndex) {
 
   if (bitCode !== undefined) {
     drawHeroBody(ctx, bitCode);
-    drawHeroEyes(ctx);
   }
 
   const angles = [90, 210, 330].map(d => d * Math.PI / 180);
   for (let i = 0; i < angles.length; i++) {
-    drawAnchor(ctx, CX + Math.cos(angles[i])*ANCHOR_R, CY + Math.sin(angles[i])*ANCHOR_R, angles[i]);
+    drawAnchor(ctx, CX + Math.cos(angles[i])*ANCHOR_R, CY + Math.sin(angles[i])*ANCHOR_R);
   }
 }
 
@@ -273,10 +249,46 @@ function encode() {
   document.getElementById('encPhrase').textContent = p ? `"${p}"` : '(немає у вазі)';
 }
 
+function downloadSVG() {
+  const idx = document.getElementById('encId').value || '0';
+  const bitCode = VALID_CODES[idx];
+  if (bitCode === undefined) return;
+
+  const points = generateRunePoints(bitCode);
+  
+  // Формуємо чистий dpath для SVG з точок
+  let dPath = `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`;
+  for (let i = 1; i < points.length; i++) {
+    dPath += ` L ${points[i].x.toFixed(2)} ${points[i].y.toFixed(2)}`;
+  }
+  dPath += ' Z';
+
+  const angles = [90, 210, 330].map(d => d * Math.PI / 180);
+  let circlesSvg = '';
+  for (let i = 0; i < angles.length; i++) {
+    const ax = (CX + Math.cos(angles[i]) * ANCHOR_R).toFixed(2);
+    const ay = (CY + Math.sin(angles[i]) * ANCHOR_R).toFixed(2);
+    circlesSvg += `\n    <circle cx="${ax}" cy="${ay}" r="${ANCHOR_SIZE}" fill="#0a0a0a" />`;
+  }
+
+  const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
+  <rect width="${W}" height="${H}" fill="none" />
+  <g id="cipher-core">
+    <path d="${dPath}" fill="#0a0a0a" />${circlesSvg}
+  </g>
+</svg>`;
+
+  const blob = new Blob([svgContent], { type: 'image/svg+xml' });
+  const a = document.createElement('a');
+  a.download = `ink-rune-architecture-${idx}.svg`;
+  a.href = URL.createObjectURL(blob);
+  a.click();
+}
+
 function downloadPNG() {
   const idx = document.getElementById('encId').value || '0';
   const a = document.createElement('a');
-  a.download = `ink-dynamic-wave-${idx}.png`;
+  a.download = `ink-modular-rune-${idx}.png`;
   a.href = document.getElementById('encCanvas').toDataURL('image/png');
   a.click();
 }

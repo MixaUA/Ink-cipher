@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Ink Cipher: Dynamic Base Fix</title>
+<title>Ink Cipher: Autonomous Lock</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#f0ede4;font-family:Georgia,serif;min-height:100vh}
@@ -70,7 +70,7 @@ video{position:absolute;top:0;left:0;z-index:1}
 <div class="panel active" id="tab-enc">
   <canvas id="encCanvas" width="480" height="480"></canvas>
   <div class="row">
-    <input type="number" id="encId" value="42" min="0" max="100" placeholder="ID фрази"/>
+    <input type="number" id="encId" value="42" min="0" placeholder="ID фрази"/>
     <button class="primary" onclick="encode()">Намалювати Блоба</button>
     <button onclick="downloadPNG()">Зберегти PNG</button>
   </div>
@@ -86,7 +86,7 @@ video{position:absolute;top:0;left:0;z-index:1}
   </div>
 
   <div class="row" style="margin-top:10px">
-    <button class="primary" onclick="startCam()">Увімкенути радар</button>
+    <button class="primary" onclick="startCam()">Увімкнути радар</button>
     <button onclick="stopCam()">Зупинити</button>
   </div>
   <div class="status" id="decStatus">Очікування запуска...</div>
@@ -109,7 +109,7 @@ video{position:absolute;top:0;left:0;z-index:1}
     <h3 id="dbTitle">БАЗА ФРАЗ</h3>
     <div class="db-list" id="dbList"></div>
     <div class="add-row">
-      <input type="number" id="newId" placeholder="ID" min="0" max="100"/>
+      <input type="number" id="newId" placeholder="ID" min="0"/>
       <input type="text" id="newPhrase" placeholder="Текст магічної фрази..."/>
       <button onclick="addEntry()">Додати</button>
     </div>
@@ -156,7 +156,6 @@ function initValidCodes() {
     if (!hasTriple) VALID_CODES.push(code);
   }
 
-  // Динамічне підлаштування лімітів під фактичну довжину масиву
   const maxIdx = VALID_CODES.length - 1;
   document.getElementById('mainSub').textContent = `Ковзне вікно патернів 3 з 8 (Доступні індекси: 0–${maxIdx})`;
   document.getElementById('dbTitle').textContent = `БАЗА ФРАЗ (Дозволені індекси 0 – ${maxIdx})`;
@@ -487,10 +486,10 @@ function updateInterfaceStatus(statusText, scannedPhrase) {
   const st = document.getElementById('decStatus');
   const ph = document.getElementById('decPhrase');
 
-  if (lockIndex !== null && DB[lockIndex]) {
+  if (lockIndex !== null) {
     st.className = 'status ok';
-    st.textContent = `✓ ПАТЕРН ЗАФІКСОВАНО! Фраза #${lockIndex} (Утримання 5с)`;
-    ph.textContent = `"${DB[lockIndex]}"`;
+    st.textContent = `✓ ПАТЕРН ЗАФІКСОВАНО! Індекс #${lockIndex} (Утримання 5с)`;
+    ph.textContent = DB[lockIndex] ? `"${DB[lockIndex]}"` : `(фраза для #${lockIndex} відсутня у базі)`;
   } else {
     st.className = scannedPhrase ? 'status ok' : 'status';
     st.textContent = statusText;

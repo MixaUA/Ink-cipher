@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Ink Cipher: Hero Edition</title>
+<title>Ink Cipher: 12-Bit Hero</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#f0ede4;font-family:Georgia,serif;min-height:100vh}
@@ -59,7 +59,7 @@ video{position:absolute;top:0;left:0;z-index:1}
 </head>
 <body>
 <h1>✦ Ink Cipher ✦</h1>
-<p class="subtitle">Клякса-Герой — кодуй емоції та тексти у векторі</p>
+<p class="subtitle">Органічна Клякса-Герой — 12-бітна архітектура (4096 варіацій)</p>
 
 <div class="tabs">
   <div class="tab active" onclick="switchTab('enc')">Кодер</div>
@@ -70,7 +70,7 @@ video{position:absolute;top:0;left:0;z-index:1}
 <div class="panel active" id="tab-enc">
   <canvas id="encCanvas" width="480" height="480"></canvas>
   <div class="row">
-    <input type="number" id="encId" value="42" min="0" max="65535" placeholder="ID 0–65535"/>
+    <input type="number" id="encId" value="42" min="0" max="4095" placeholder="ID 0–4095"/>
     <button class="primary" onclick="encode()">Намалювати Героя</button>
     <button onclick="downloadPNG()">Зберегти PNG</button>
   </div>
@@ -106,10 +106,10 @@ video{position:absolute;top:0;left:0;z-index:1}
 
 <div class="panel" id="tab-db">
   <div class="db-wrap">
-    <h3>БАЗА ФРАЗ</h3>
+    <h3>БАЗА ФРАЗ (0 – 4095)</h3>
     <div class="db-list" id="dbList"></div>
     <div class="add-row">
-      <input type="number" id="newId" placeholder="ID" min="0" max="65535"/>
+      <input type="number" id="newId" placeholder="ID" min="0" max="4095"/>
       <input type="text" id="newPhrase" placeholder="Текст фрази..."/>
       <button onclick="addEntry()">Додати</button>
     </div>
@@ -117,7 +117,7 @@ video{position:absolute;top:0;left:0;z-index:1}
 </div>
 
 <script>
-/* ── База фраз ── */
+/* ── База фраз (Максимум 4095) ── */
 let DB = {
   0:"Початок усього — тиша перед першим словом.",
   1:"Зірки пам'ятають кожну дитячу мрію.",
@@ -127,123 +127,109 @@ let DB = {
   99:"За горизонтом живуть дракони і добрі велетні.",
   256:"Магія криється у звичайних числах.",
   1000:"Тисяча кроків починається з одного подиху.",
-  65535:"Останній рядок найстарішої казки світу."
+  4095:"Остання сторінка чарівної книги клякс."
 };
 
-/* ── Геометричні Константи ── */
+/* ── Оновлені константи під 12 біт ── */
 const W=480, H=480, CX=240, CY=240;
 const ANCHOR_R = 155; 
 const ANCHOR_SIZE = 14;
-const N_DATA = 16;
+const N_DATA = 12; // Рівно 12 променів-щупалець (крок 30 градусів)
 
-// Нижня точка трикутника (оригінальний ANCHOR_ANGLES був [90, 210, 330] у градусах)
-// В радіанах нижній гострий кут відповідає 90 градусам (Math.PI / 2)
-const START_ANGLE = Math.PI / 2; 
+const START_ANGLE = Math.PI / 2; // Нижній кут трикутника (0 градусів)
 
 let lastLoggedId = null;
 
 function mkRng(seed) {
-  let s = (seed ^ 0xDEADBEEF) >>> 0;
+  let s = (seed ^ 0x5EED1234) >>> 0;
   return () => { s = Math.imul(1664525, s) + 1013904223 >>> 0; return s / 4294967296; };
 }
 
-/* ── Художні декоративні бризки за межами клякси ── */
+/* ── Художні випадкові бризки в проміжках між бітами ── */
 function drawOuterSplashes(ctx, rng) {
   ctx.save();
   ctx.fillStyle = '#0a0a0a';
-  for (let i = 0; i < 24; i++) {
+  for (let i = 0; i < 16; i++) {
     const a = rng() * Math.PI * 2;
-    // Малюємо бризки далеко — на відстані від 115 до 145 пікселів (поза межами клякси)
-    const r = 115 + rng() * 30; 
-    ctx.globalAlpha = 0.15 + rng() * 0.4;
+    // Виносимо художні цятки за основне тіло (від 110 до 140 пікселів)
+    const r = 110 + rng() * 30; 
+    ctx.globalAlpha = 0.2 + rng() * 0.4;
     ctx.beginPath();
-    ctx.arc(CX + Math.cos(a)*r, CY + Math.sin(a)*r, 1 + rng()*3, 0, Math.PI*2);
+    ctx.arc(CX + Math.cos(a)*r, CY + Math.sin(a)*r, 1.5 + rng()*2.5, 0, Math.PI*2);
     ctx.fill();
   }
   ctx.restore();
 }
 
-/* ── Малювання живих очей персонажа в центрі ── */
+/* ── Малювання очей персонажа в самому центрі ── */
 function drawHeroEyes(ctx, rng) {
   ctx.save();
-  
-  // Позиція лівого і правого ока відносно центру клякси
-  const eyeSpacing = 14;
-  const eyeY = -6;
-  
+  const eyeSpacing = 13;
+  const eyeY = -5;
   const lx = CX - eyeSpacing, rx = CX + eyeSpacing;
   const ly = CY + eyeY, ry = CY + eyeY;
-  const eyeRadius = 6.5;
+  const eyeRadius = 7;
 
-  // Білки очей
   ctx.fillStyle = '#f8f5ee';
   ctx.beginPath(); ctx.arc(lx, ly, eyeRadius, 0, Math.PI*2); ctx.fill();
   ctx.beginPath(); ctx.arc(rx, ry, eyeRadius, 0, Math.PI*2); ctx.fill();
 
-  // Живий випадковий погляд зіниць (трохи рандому)
   const lookX = (rng() - 0.5) * 3;
   const lookY = (rng() - 0.5) * 2;
 
-  // Зіниці
   ctx.fillStyle = '#0a0a0a';
-  ctx.beginPath(); ctx.arc(lx + lookX, ly + lookY, 3, 0, Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.arc(rx + lookX, ry + lookY, 3, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(lx + lookX, ly + lookY, 3.2, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(rx + lookX, ry + lookY, 3.2, 0, Math.PI*2); ctx.fill();
 
-  // Бліки в очах для милоти
   ctx.fillStyle = '#ffffff';
   ctx.beginPath(); ctx.arc(lx + lookX - 1, ly + lookY - 1, 1, 0, Math.PI*2); ctx.fill();
   ctx.beginPath(); ctx.arc(rx + lookX - 1, ry + lookY - 1, 1, 0, Math.PI*2); ctx.fill();
-
   ctx.restore();
 }
 
-/* ── Генерація єдиного тіла клякси на базі 16 біт ── */
+/* ── Побудова тіла клякси з 12 жирними округлими щупальцями ── */
 function drawHeroBody(ctx, id, rng) {
   const bits = [];
-  for (let i = 15; i >= 0; i--) bits.push((id >> i) & 1);
+  for (let i = 11; i >= 0; i--) bits.push((id >> i) & 1);
 
-  const baseR = 64;   // Внутрішнє базове коло
-  const stepPts = 64; // Кількість точок для плавності кривих Безьє
-  const pts = [];
-
-  for (let s = 0; s < stepPts; s++) {
-    const angleFromStart = (s / stepPts) * Math.PI * 2;
-    const globalAngle = START_ANGLE + angleFromStart;
-
-    // Шукаємо найближчий інформаційний промінь з 16 можливих
-    const exactBitIdx = (angleFromStart / (Math.PI * 2) * N_DATA);
-    const baseIdx = Math.floor(exactBitIdx) % N_DATA;
-    const nextIdx = (baseIdx + 1) % N_DATA;
-    const t = exactBitIdx - Math.floor(exactBitIdx);
-
-    // Плавно інтерпулюємо радіус між сусідніми бітами
-    const bitVal1 = bits[baseIdx];
-    const bitVal2 = bits[nextIdx];
-    const smoothBit = bitVal1 * (1 - t) + bitVal2 * t;
-
-    // Виступ (1) = до 96 пікселів, Впадина (0) = до 52 пікселів
-    let targetR = baseR + (smoothBit ? 32 : -12);
-
-    // Додаємо мікро-хвилі, щоб клякса виглядала природно і гармонійно
-    targetR += Math.sin(angleFromStart * 8) * 3 + (rng() - 0.5) * 4;
-
-    pts.push({
-      x: CX + Math.cos(globalAngle) * targetR,
-      y: CY + Math.sin(globalAngle) * targetR
-    });
-  }
-
-  // Малюємо суцільну кляксу через плавну криву
+  const baseR = 56; // Ядро клякси
   ctx.save();
   ctx.fillStyle = '#0a0a0a';
+  
+  // Малюємо м'яке центральне тіло
   ctx.beginPath();
-  ctx.moveTo(pts[0].x, pts[0].y);
-  for (let i = 0; i < stepPts; i++) {
-    const p = pts[i], pn = pts[(i+1)%stepPts];
-    ctx.lineTo((p.x + pn.x)/2, (p.y + pn.y)/2);
-  }
-  ctx.closePath();
+  ctx.arc(CX, CY, baseR + 4, 0, Math.PI * 2);
   ctx.fill();
+
+  // Нарощуємо 12 органічних щупалець
+  for (let i = 0; i < N_DATA; i++) {
+    const angleFromStart = (i / N_DATA) * Math.PI * 2;
+    const globalAngle = START_ANGLE + angleFromStart;
+    
+    // 1 = Довге округле щупальце (94px), 0 = Коротка опуклість (63px)
+    const len = bits[i] === 1 ? (92 + rng() * 6) : (61 + rng() * 4);
+    // Товщина міняється для природності форми
+    const thickness = bits[i] === 1 ? 16 : 22;
+
+    const ex = CX + Math.cos(globalAngle) * len;
+    const ey = CY + Math.sin(globalAngle) * len;
+
+    ctx.beginPath();
+    ctx.lineCap = 'round';
+    ctx.lineWidth = thickness;
+    ctx.strokeStyle = '#0a0a0a';
+    ctx.moveTo(CX, CY);
+    ctx.lineTo(ex, ey);
+    ctx.stroke();
+
+    // Капілярні художні мікро-бризки на кінцях довгих відростків
+    if (bits[i] === 1 && rng() > 0.4) {
+      const spD = len + 13 + rng()*6;
+      ctx.beginPath();
+      ctx.arc(CX + Math.cos(globalAngle)*spD, CY + Math.sin(globalAngle)*spD, 2, 0, Math.PI*2);
+      ctx.fill();
+    }
+  }
   ctx.restore();
 }
 
@@ -258,42 +244,33 @@ function drawAnchor(ctx, cx, cy) {
   ctx.restore();
 }
 
-/* ── ГОЛОВНИЙ КОДЕР ── */
+/* ── РЕНДЕР КОДЕРА ── */
 function drawSymbol(id) {
   const canvas = document.getElementById('encCanvas');
   const ctx = canvas.getContext('2d');
-  const rng = mkRng(id ^ 0xABC123);
+  const rng = mkRng(id ^ 0x7F);
 
   ctx.clearRect(0, 0, W, H);
   ctx.fillStyle = '#f8f5ee';
   ctx.fillRect(0, 0, W, H);
 
-  // 1. Малюємо тіло героя з бітовими хвилями
   drawHeroBody(ctx, id, rng);
-
-  // 2. Вживляємо очі в центр
   drawHeroEyes(ctx, rng);
-
-  // 3. Розкидуємо декоративний шум назовні
   drawOuterSplashes(ctx, rng);
 
-  // 4. Малюємо 3 якорі строго по вершинах трикутника
-  // Кути в градусах: 90 (нижній), 210 (лівий верхній), 330 (правий верхній)
+  // 3 якорі по вершинах трикутника (90, 210, 330 градусів)
   const angles = [90, 210, 330].map(d => d * Math.PI / 180);
   for (const a of angles) {
-    const ax = CX + Math.cos(a) * ANCHOR_R;
-    const ay = CY + Math.sin(a) * ANCHOR_R;
-    drawAnchor(ctx, ax, ay);
+    drawAnchor(ctx, CX + Math.cos(a)*ANCHOR_R, CY + Math.sin(a)*ANCHOR_R);
   }
 }
 
 function encode() {
-  const id = Math.max(0, Math.min(65535, parseInt(document.getElementById('encId').value)||0));
+  const id = Math.max(0, Math.min(4095, parseInt(document.getElementById('encId').value)||0));
   drawSymbol(id);
   const bits = [];
-  for (let i = 15; i >= 0; i--) bits.push((id>>i)&1);
-  document.getElementById('encInfo').textContent =
-    `ID ${id}  ·  ${bits.slice(0,8).join('')} ${bits.slice(8).join('')}`;
+  for (let i = 11; i >= 0; i--) bits.push((id>>i)&1);
+  document.getElementById('encInfo').textContent = `ID ${id}  ·  ${bits.slice(0,6).join('')} ${bits.slice(6).join('')}`;
   const p = DB[id];
   document.getElementById('encPhrase').textContent = p ? `"${p}"` : '(немає у базі)';
 }
@@ -301,12 +278,12 @@ function encode() {
 function downloadPNG() {
   const id = document.getElementById('encId').value || '0';
   const a = document.createElement('a');
-  a.download = `ink-hero-${id}.png`;
+  a.download = `ink-hero12-${id}.png`;
   a.href = document.getElementById('encCanvas').toDataURL('image/png');
   a.click();
 }
 
-/* ── АВТОМАТИЧНИЙ ДЕКОДЕР (МАТРЬОШКА РАДАРІВ) ── */
+/* ── АВТОМАТИЧНИЙ 12-БІТНИЙ ДЕКОДЕР ── */
 let camStream = null, scanTimer = null;
 
 async function startCam() {
@@ -317,11 +294,11 @@ async function startCam() {
     });
     video.srcObject = camStream;
     document.getElementById('scanLine').style.display = 'block';
-    logMsg('Роботизований радар запущено. Шукаю Героя...');
-    scanTimer = setInterval(scanFrame, 300);
+    logMsg('12-променевий радар активовано. Очікування клякси...');
+    scanTimer = setInterval(scanFrame, 250);
   } catch(e) {
     document.getElementById('decStatus').className = 'status err';
-    document.getElementById('decStatus').textContent = 'Помилка камери: ' + e.message;
+    document.getElementById('decStatus').textContent = 'Камера недоступна: ' + e.message;
   }
 }
 
@@ -355,15 +332,13 @@ function tryDecode(ctx, W, H) {
     return data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
   }
 
-  // Обчислення динамічного порогу яскравості
   let totalLum = 0;
   for (let i = 0; i < data.length; i += 32) {
     totalLum += data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
   }
   const avgLum = totalLum / (data.length / 32);
-  const THRESH = Math.min(110, avgLum * 0.78);
+  const THRESH = Math.min(115, avgLum * 0.76);
 
-  // Знаходження темних об'єктів (якорів)
   const darkBlobs = [];
   const visited = new Uint8Array(W * H);
 
@@ -389,12 +364,11 @@ function tryDecode(ctx, W, H) {
   darkBlobs.sort((a, b) => b.size - a.size);
   if (darkBlobs.length < 3) {
     ctx.clearRect(0, 0, W, H);
-    setDecStatus('Шукаю трикутник лінз...', '');
+    setDecStatus('Шукаю тріаду якорів...', '');
     return;
   }
 
-  // Знаходимо найкращий рівнобедрений трикутник
-  const candidates = darkBlobs.slice(0, Math.min(10, darkBlobs.length));
+  const candidates = darkBlobs.slice(0, Math.min(9, darkBlobs.length));
   let bestTriangle = null, bestScore = Infinity;
 
   for (let a = 0; a < candidates.length; a++) {
@@ -403,9 +377,9 @@ function tryDecode(ctx, W, H) {
         const pa = candidates[a], pb = candidates[b], pc = candidates[c];
         const d1 = dist(pa, pb), d2 = dist(pb, pc), d3 = dist(pa, pc);
         const avg = (d1 + d2 + d3) / 3;
-        if (avg < 40) continue;
+        if (avg < 45) continue;
         const score = (Math.abs(d1 - avg) + Math.abs(d2 - avg) + Math.abs(d3 - avg)) / avg;
-        if (score < bestScore && score < 0.25) {
+        if (score < bestScore && score < 0.22) {
           bestScore = score;
           bestTriangle = [pa, pb, pc];
         }
@@ -415,7 +389,7 @@ function tryDecode(ctx, W, H) {
 
   if (!bestTriangle) {
     ctx.clearRect(0, 0, W, H);
-    setDecStatus('Аналізую геометрію...', '');
+    setDecStatus('Калібрування кутів трикутника...', '');
     return;
   }
 
@@ -423,27 +397,25 @@ function tryDecode(ctx, W, H) {
   const cx = (pa.x + pb.x + pc.x) / 3;
   const cy = (pa.y + pb.y + pc.y) / 3;
 
-  // Визначаємо нижній якір (той, у якого найбільша координата Y)
+  // Визначаємо нижній якір для синхронізації 0 градусів
   const bottomAnchor = [pa, pb, pc].reduce((best, p) => p.y > best.y ? p : best);
   const baseSide = (dist(pa, pb) + dist(pb, pc) + dist(pa, pc)) / 3;
-
-  // Обчислюємо кут повороту камери відносно нижнього кута
   const currentRotation = Math.atan2(bottomAnchor.y - cy, bottomAnchor.x - cx);
 
   ctx.clearRect(0, 0, W, H);
 
-  // Малюємо трикутник позиціонування
-  ctx.strokeStyle = 'rgba(0, 0, 255, 0.4)';
+  // Малюємо рамку трикутника
+  ctx.strokeStyle = 'rgba(0, 120, 255, 0.35)';
   ctx.lineWidth = 1.5;
   ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.lineTo(pc.x, pc.y); ctx.closePath(); ctx.stroke();
 
-  // Радіуси нашої ідеальної «матрьошки» відносно сторони трикутника
-  const radarCircleR = baseSide * (128 / 310); // Зовнішнє коло-радар
-  const baseCircleR  = baseSide * (68 / 310);  // Внутрішнє базове коло-екватор
+  // Радіуси матрьошки адаптовані під 12 біт
+  const radarCircleR = baseSide * (125 / 310); 
+  const baseCircleR  = baseSide * (73 / 310);  // Оновлена планка екватора
 
   const bits = [];
 
-  // ЗАКУСКА РАДАРУ: 16 кроків по 22.5 градусів, старт з нижнього кута
+  // СКАНИРОВАНИЕ: 12 кроків по 30 градусів
   for (let i = 0; i < N_DATA; i++) {
     const angleFromStart = (i / N_DATA) * Math.PI * 2;
     const globalAngle = currentRotation + angleFromStart;
@@ -451,12 +423,10 @@ function tryDecode(ctx, W, H) {
     let foundDark = false;
     let edgeX = cx, edgeY = cy;
 
-    // Промінь радара стріляє із ЗОВНІШНЬОГО КОЛА всередину до центру
-    for (let d = radarCircleR; d >= 5; d -= 2) {
+    for (let d = radarCircleR; d >= 6; d -= 2) {
       const px = cx + Math.cos(globalAngle) * d;
       const py = cy + Math.sin(globalAngle) * d;
 
-      // Перевірка суцільності (фільтр поодиноких брудних бризок)
       if (lum(px, py) < THRESH * 1.05) {
         let dense = 0;
         if (lum(px+1, py) < THRESH * 1.05) dense++;
@@ -464,16 +434,11 @@ function tryDecode(ctx, W, H) {
         if (lum(px, py+1) < THRESH * 1.05) dense++;
         if (lum(px, py-1) < THRESH * 1.05) dense++;
 
-        if (dense >= 2) { // Реагуємо тільки на суцільне тіло клякси
+        if (dense >= 2) {
           foundDark = true;
-          edgeX = px;
-          edgeY = py;
-          
-          // Рахуємо фінальну відстань від центру до контуру герою
-          const finalDistToCenter = d;
+          edgeX = px; edgeY = py;
 
-          // РІШЕННЯ: Якщо контур зустрівся далі ніж базове коло — це виступ (1)
-          if (finalDistToCenter > baseCircleR) {
+          if (d > baseCircleR) {
             bits.push(1);
           } else {
             bits.push(0);
@@ -483,30 +448,27 @@ function tryDecode(ctx, W, H) {
       }
     }
 
-    if (!foundDark) {
-      bits.push(0); // Якщо промінь взагалі пройшов у порожнечу — це 0
-    }
+    if (!foundDark) bits.push(0);
 
-    // Візуалізація точок радара (Червоний = 1, Зелений = 0)
-    ctx.fillStyle = bits[bits.length - 1] === 1 ? '#ff0000' : '#00ff00';
-    ctx.beginPath(); ctx.arc(edgeX, edgeY, 3.5, 0, Math.PI * 2); ctx.fill();
+    // Візуалізація дебаг-радара на контурі клякси
+    ctx.fillStyle = bits[bits.length - 1] === 1 ? '#ff3333' : '#33ff33';
+    ctx.beginPath(); ctx.arc(edgeX, edgeY, 4, 0, Math.PI * 2); ctx.fill();
   }
 
-  // Перетворюємо масив 16 біт у підсумковий ID
   let id = 0;
-  for (let i = 0; i < 16; i++) id = (id << 1) | bits[i];
+  for (let i = 0; i < 12; i++) id = (id << 1) | bits[i];
 
   const phrase = DB[id];
   if (phrase) {
-    setDecStatus(`✓ Розпізнано Персонажа! ID: ${id}`, phrase);
+    setDecStatus(`✓ ГЕРОЙ ІДЕНТИФІКОВАНИЙ! ID: ${id}`, phrase);
     if (lastLoggedId !== id) {
-      logMsg(`[HERO FOUND] ID: ${id} -> "${phrase.substring(0,22)}..."`);
+      logMsg(`[OK] Успішно! ID: ${id} -> "${phrase.substring(0,24)}..."`);
       lastLoggedId = id;
     }
   } else {
-    setDecStatus(`Зчитано ID Клякси: ${id}`, '');
+    setDecStatus(`Зчитано ID Героя: ${id}`, '');
     if (lastLoggedId !== id && id !== 0) {
-      logMsg(`[SCAN] Нова форма ID: ${id} (немає в базі фраз)`);
+      logMsg(`[WARN] Зчитано ID: ${id} (немає в базі)`);
       lastLoggedId = id;
     }
   }
@@ -534,7 +496,7 @@ function clearLog() { document.getElementById('logBody').textContent = ''; lastL
 
 function copyLog() {
   navigator.clipboard.writeText(document.getElementById('logBody').textContent).then(() => {
-    alert('Лог скопійовано!');
+    alert('Лог скопійовано у буфер!');
   });
 }
 
@@ -553,7 +515,7 @@ function renderDB() {
 function addEntry() {
   const id = parseInt(document.getElementById('newId').value);
   const phrase = document.getElementById('newPhrase').value.trim();
-  if (isNaN(id)||id<0||id>65535||!phrase) return;
+  if (isNaN(id)||id<0||id>4095||!phrase) return;
   DB[id] = phrase;
   document.getElementById('newId').value = '';
   document.getElementById('newPhrase').value = '';

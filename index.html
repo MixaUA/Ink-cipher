@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Ink Cipher: Pure Sine Smooth Blob</title>
+<title>Ink Cipher: 574 Wave Blob</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#f0ede4;font-family:Georgia,serif;min-height:100vh}
@@ -59,7 +59,7 @@ video{position:absolute;top:0;left:0;z-index:1}
 </head>
 <body>
 <h1>✦ Ink Cipher ✦</h1>
-<p class="subtitle">Синусоїдальна Клякса — 12 Біт (Обмежені Піки й Впадини)</p>
+<p class="subtitle">Ідеальна Хвиля — База з 574 комбінацій (Індекс 0–573)</p>
 
 <div class="tabs">
   <div class="tab active" onclick="switchTab('enc')">Кодер</div>
@@ -70,8 +70,8 @@ video{position:absolute;top:0;left:0;z-index:1}
 <div class="panel active" id="tab-enc">
   <canvas id="encCanvas" width="480" height="480"></canvas>
   <div class="row">
-    <input type="number" id="encId" value="42" min="0" max="4095" placeholder="ID 0–4095"/>
-    <button class="primary" onclick="encode()">Намалювати Героя</button>
+    <input type="number" id="encId" value="42" min="0" max="573" placeholder="Номер фрази 0–573"/>
+    <button class="primary" onclick="encode()">Намалювати Блоба</button>
     <button onclick="downloadPNG()">Зберегти PNG</button>
   </div>
   <div class="info" id="encInfo"></div>
@@ -86,7 +86,7 @@ video{position:absolute;top:0;left:0;z-index:1}
   </div>
 
   <div class="row" style="margin-top:10px">
-    <button class="primary" onclick="startCam()">Увімкнути камеру</button>
+    <button class="primary" onclick="startCam()">Увімкнути радар</button>
     <button onclick="stopCam()">Зупинити</button>
   </div>
   <div class="status" id="decStatus">Очікування запуска...</div>
@@ -94,7 +94,7 @@ video{position:absolute;top:0;left:0;z-index:1}
 
   <div class="terminal-wrap">
     <div class="terminal-head">
-      <span>LOG TERMINAL</span>
+      <span>WAVE LOGS</span>
       <div>
         <button onclick="copyLog()">Копіювати</button>
         <button onclick="clearLog()">Очистити</button>
@@ -106,49 +106,71 @@ video{position:absolute;top:0;left:0;z-index:1}
 
 <div class="panel" id="tab-db">
   <div class="db-wrap">
-    <h3>БАЗА ФРАЗ (0 – 4095)</h3>
+    <h3>БАЗА ФРАЗ (Дозволені індекси 0 – 573)</h3>
     <div class="db-list" id="dbList"></div>
     <div class="add-row">
-      <input type="number" id="newId" placeholder="ID" min="0" max="4095"/>
-      <input type="text" id="newPhrase" placeholder="Текст фрази..."/>
+      <input type="number" id="newId" placeholder="Індекс 0-573" min="0" max="573"/>
+      <input type="text" id="newPhrase" placeholder="Текст магічної фрази..."/>
       <button onclick="addEntry()">Додати</button>
     </div>
   </div>
 </div>
 
 <script>
+// Наша базова демонстраційна книга фраз тепер прив'язана до нових чистих індексів
 let DB = {
-  0:"Початок усього — тиша перед першим словом.",
-  1:"Зірки пам'ятають кожну дитячу мрію.",
-  7:"Ліс дихає разом з тобою, варто лише зупинитись.",
-  13:"Кожна крапля дощу несе свое ім'я.",
-  42:"Відповідь на всі питання — справді сорок два!",
-  99:"За горизонтом живуть дракони і добрі велетні.",
-  256:"Магія криється у звичайних числах.",
-  1000:"Тисяча кроків починається з одного подиху.",
-  4095:"Остання сторінка чарівної книги клякс."
+  0: "Початок усього — тиша перед першим словом.",
+  7: "Ліс дихає разом з тобою, варто лише зупинитись.",
+  13: "Кожна крапля дощу несе своє таємне ім'я.",
+  42: "Відповідь на всі питання Всесвіту знайшлася в кляксі!",
+  100: "Магія криється в деталях, які ніхто не помічає.",
+  573: "Остання сторінка чарівної книги секторних хвиль."
 };
 
 const W=480, H=480, CX=240, CY=240;
 const ANCHOR_R = 155; 
 const ANCHOR_SIZE = 14;
 const N_DATA = 12; 
+const START_ANGLE = Math.PI / 2; 
 
-const START_ANGLE = Math.PI / 2; // Лінія нижнього кута трикутника (0 градусів радара)
 let lastLoggedId = null;
 
+// ГЕНЕРАЦІЯ 574 НАДІЙНИХ ХВИЛЯСТИХ КОМБІНАЦІЙ
+const VALID_CODES = [];
+function initValidCodes() {
+  for (let code = 0; code < 4096; code++) {
+    const bits = [];
+    for (let i = 11; i >= 0; i--) bits.push((code >> i) & 1);
+    
+    // Перевірка циклічного кола на наявність 3 однакових бітів підряд
+    let hasTriple = false;
+    for (let i = 0; i < 12; i++) {
+      const b0 = bits[i];
+      const b1 = bits[(i + 1) % 12];
+      const b2 = bits[(i + 2) % 12];
+      if (b0 === b1 && b1 === b2) {
+        hasTriple = true;
+        break;
+      }
+    }
+    if (!hasTriple) {
+      VALID_CODES.push(code);
+    }
+  }
+}
+initValidCodes(); // Створюємо залізобетонну базу на старті
+
 function mkRng(seed) {
-  let s = (seed ^ 0x1A2B3C4D) >>> 0;
+  let s = (seed ^ 0x5B6C7D8E) >>> 0;
   return () => { s = Math.imul(1664525, s) + 1013904223 >>> 0; return s / 4294967296; };
 }
 
-/* ── Художні краплі на фоні ── */
 function drawOuterSplashes(ctx, rng) {
   ctx.save();
   ctx.fillStyle = '#0a0a0a';
-  for (let i = 0; i < 14; i++) {
+  for (let i = 0; i < 12; i++) {
     const a = rng() * Math.PI * 2;
-    const r = 115 + rng() * 25; 
+    const r = 110 + rng() * 25; 
     ctx.globalAlpha = 0.2 + rng() * 0.3;
     ctx.beginPath();
     ctx.arc(CX + Math.cos(a)*r, CY + Math.sin(a)*r, 1.5 + rng()*2, 0, Math.PI*2);
@@ -157,13 +179,11 @@ function drawOuterSplashes(ctx, rng) {
   ctx.restore();
 }
 
-/* ── Оченята ── */
 function drawHeroEyes(ctx, rng) {
   ctx.save();
   const eyeSpacing = 11;
-  const eyeY = -4;
   const lx = CX - eyeSpacing, rx = CX + eyeSpacing;
-  const ly = CY + eyeY, ry = CY + eyeY;
+  const ly = CY - 4, ry = CY - 4;
   ctx.fillStyle = '#f8f5ee';
   ctx.beginPath(); ctx.arc(lx, ly, 6, 0, Math.PI*2); ctx.fill();
   ctx.beginPath(); ctx.arc(rx, ry, 6, 0, Math.PI*2); ctx.fill();
@@ -173,41 +193,38 @@ function drawHeroEyes(ctx, rng) {
   ctx.restore();
 }
 
-/* ── ЧИСТА СИНУСОЇДАЛЬНА КЛЯКСА З ОБМЕЖЕНИМИ АМПЛІТУДАМИ ── */
-function drawHeroBody(ctx, id, rng) {
+/* ── НОВА ЛОГІКА: ГЛАДКА ГЕНЕРАЦІЯ БЕЗ ГОСТРИХ КУТІВ ── */
+function drawHeroBody(ctx, bitCode, rng) {
   const bits = [];
-  for (let i = 11; i >= 0; i--) bits.push((id >> i) & 1);
+  for (let i = 11; i >= 0; i--) bits.push((bitCode >> i) & 1);
 
-  const baseCircleR = 66; // Вписане коло (наш нульовий рівень)
-  const totalPoints = 180; // Висока роздільна здатність для ідеальної гладкості
+  const baseCircleR = 66; // Вписане коло
+  const totalPoints = 180;
   const points = [];
 
   for (let p = 0; p < totalPoints; p++) {
     const angleFromStart = (p / totalPoints) * Math.PI * 2;
     const globalAngle = START_ANGLE + angleFromStart;
 
-    // Математично визначаємо поточний сектор та його центр
-    const sectorFloat = (angleFromStart / (Math.PI * 2)) * N_DATA;
-    const sectorIdx = Math.floor(sectorFloat) % N_DATA;
+    // Шукаємо два сусідні центри секторів для ідеально м'якої інтерполяції
+    const sectorFloat = (angleFromStart / (Math.PI * 2)) * N_DATA - 0.5;
+    const idx1 = (Math.floor(sectorFloat) + 12) % 12;
+    const idx2 = (idx1 + 1) % 12;
+    const t = sectorFloat - Math.floor(sectorFloat);
 
-    // Синусоїдальний профіль сектора: максимальний вплив біта — строго по центру сектора
-    const bitValue = bits[sectorIdx];
-    
-    // Амплітуда: 1 = виступ (+20px), 0 = впадина (-12px)
-    const targetAmp = bitValue === 1 ? 20 : -12;
+    const amp1 = bits[idx1] === 1 ? 22 : -12;
+    const amp2 = bits[idx2] === 1 ? 22 : -12;
 
-    // Плавна синусоїда на базі кута всередині сектора
-    const sectorAngle = (sectorFloat - sectorIdx) * Math.PI; // від 0 до PI всередині сектора
-    let currentWave = Math.sin(sectorAngle) * targetAmp;
+    // Косинусна інтерполяція між центрами секторів — прибирає будь-які сходинки
+    const mu = (1 - Math.cos(t * Math.PI)) / 2;
+    const currentRadius = baseCircleR + (amp1 * (1 - mu) + amp2 * mu);
 
-    let r = baseCircleR + currentWave;
-
-    // Легкий, ледь помітний природний шум, щоб лінія не була стерильно комп'ютерною
-    r += Math.sin(angleFromStart * 8) * 2.5;
+    // Органічний живий контур
+    const organicNoise = Math.sin(angleFromStart * 6) * 2 + Math.cos(angleFromStart * 12) * 1;
 
     points.push({
-      x: CX + Math.cos(globalAngle) * r,
-      y: CY + Math.sin(globalAngle) * r
+      x: CX + Math.cos(globalAngle) * (currentRadius + organicNoise),
+      y: CY + Math.sin(globalAngle) * (currentRadius + organicNoise)
     });
   }
 
@@ -215,9 +232,7 @@ function drawHeroBody(ctx, id, rng) {
   ctx.fillStyle = '#0a0a0a';
   ctx.beginPath();
   ctx.moveTo(points[0].x, points[0].y);
-  for (let i = 1; i < totalPoints; i++) {
-    ctx.lineTo(points[i].x, points[i].y);
-  }
+  for (let i = 1; i < totalPoints; i++) ctx.lineTo(points[i].x, points[i].y);
   ctx.closePath();
   ctx.fill();
   ctx.restore();
@@ -234,16 +249,19 @@ function drawAnchor(ctx, cx, cy) {
   ctx.restore();
 }
 
-function drawSymbol(id) {
+function drawSymbol(dbIndex) {
   const canvas = document.getElementById('encCanvas');
   const ctx = canvas.getContext('2d');
-  const rng = mkRng(id ^ 0xAA);
+  
+  // Беремо реальний 12-бітний код із нашого списку 574 комбінацій
+  const bitCode = VALID_CODES[dbIndex];
+  const rng = mkRng(bitCode);
 
   ctx.clearRect(0, 0, W, H);
   ctx.fillStyle = '#f8f5ee';
   ctx.fillRect(0, 0, W, H);
 
-  drawHeroBody(ctx, id, rng);
+  drawHeroBody(ctx, bitCode, rng);
   drawHeroEyes(ctx, rng);
   drawOuterSplashes(ctx, rng);
 
@@ -254,24 +272,27 @@ function drawSymbol(id) {
 }
 
 function encode() {
-  const id = Math.max(0, Math.min(4095, parseInt(document.getElementById('encId').value)||0));
-  drawSymbol(id);
+  const idx = Math.max(0, Math.min(573, parseInt(document.getElementById('encId').value)||0));
+  drawSymbol(idx);
+  
+  const bitCode = VALID_CODES[idx];
   const bits = [];
-  for (let i = 11; i >= 0; i--) bits.push((id>>i)&1);
-  document.getElementById('encInfo').textContent = `ID ${id}  ·  ${bits.slice(0,6).join('')} ${bits.slice(6).join('')}`;
-  const p = DB[id];
-  document.getElementById('encPhrase').textContent = p ? `"${p}"` : '(немає у базі)';
+  for (let i = 11; i >= 0; i--) bits.push((bitCode >> i) & 1);
+  
+  document.getElementById('encInfo').textContent = `Індекс: ${idx} / 573  ·  Бортовий код: ${bitCode}  ·  (${bits.slice(0,6).join('')} ${bits.slice(6).join('')})`;
+  const p = DB[idx];
+  document.getElementById('encPhrase').textContent = p ? `"${p}"` : '(немає у вазі)';
 }
 
 function downloadPNG() {
-  const id = document.getElementById('encId').value || '0';
+  const idx = document.getElementById('encId').value || '0';
   const a = document.createElement('a');
-  a.download = `ink-sine-blob-${id}.png`;
+  a.download = `ink-wave-index-${idx}.png`;
   a.href = document.getElementById('encCanvas').toDataURL('image/png');
   a.click();
 }
 
-/* ── НАДІЙНИЙ ДЕКОДЕР З ЗСУВОМ НА 15 ГРАДУСІВ ── */
+/* ── ДЕКОДЕР З КУТОВИМ ЗСУВОМ 15 ГРАДУСІВ ── */
 let camStream = null, scanTimer = null;
 
 async function startCam() {
@@ -282,11 +303,11 @@ async function startCam() {
     });
     video.srcObject = camStream;
     document.getElementById('scanLine').style.display = 'block';
-    logMsg('Синусоїдальний радар активовано. Пошук центрів...');
-    scanTimer = setInterval(scanFrame, 200);
+    logMsg('Мобільний радар хвиль запущено...');
+    scanTimer = setInterval(scanFrame, 220);
   } catch(e) {
     document.getElementById('decStatus').className = 'status err';
-    document.getElementById('decStatus').textContent = 'Камера недоступна: ' + e.message;
+    document.getElementById('decStatus').textContent = 'Помилка камери: ' + e.message;
   }
 }
 
@@ -295,7 +316,7 @@ function stopCam() {
   if (scanTimer) { clearInterval(scanTimer); scanTimer = null; }
   document.getElementById('scanLine').style.display = 'none';
   document.getElementById('decStatus').className = 'status';
-  document.getElementById('decStatus').textContent = 'Сканування зупинено';
+  document.getElementById('decStatus').textContent = 'Радар вимкнено';
   const dc = document.getElementById('decCanvas');
   dc.getContext('2d').clearRect(0, 0, dc.width, dc.height);
 }
@@ -321,11 +342,9 @@ function tryDecode(ctx, W, H) {
   }
 
   let totalLum = 0;
-  for (let i = 0; i < data.length; i += 32) {
-    totalLum += data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
-  }
+  for (let i = 0; i < data.length; i += 32) totalLum += data[i]*0.299 + data[i+1]*0.587 + data[i+2]*0.114;
   const avgLum = totalLum / (data.length / 32);
-  const THRESH = Math.min(115, avgLum * 0.75);
+  const THRESH = Math.min(115, avgLum * 0.76);
 
   const darkBlobs = [];
   const visited = new Uint8Array(W * H);
@@ -342,9 +361,7 @@ function tryDecode(ctx, W, H) {
           sx += cx; sy += cy; cnt++;
           queue.push([cx + 4, cy], [cx - 4, cy], [cx, cy + 4], [cx, cy - 4]);
         }
-        if (cnt > 6 && cnt < 1200) {
-          darkBlobs.push({ x: sx / cnt, y: sy / cnt, size: cnt });
-        }
+        if (cnt > 6 && cnt < 1200) darkBlobs.push({ x: sx / cnt, y: sy / cnt, size: cnt });
       }
     }
   }
@@ -352,7 +369,7 @@ function tryDecode(ctx, W, H) {
   darkBlobs.sort((a, b) => b.size - a.size);
   if (darkBlobs.length < 3) {
     ctx.clearRect(0, 0, W, H);
-    setDecStatus('Очікування стабільного кадру...', '');
+    setDecStatus('Ловлю фокус на 3 якорях...', '');
     return;
   }
 
@@ -377,7 +394,7 @@ function tryDecode(ctx, W, H) {
 
   if (!bestTriangle) {
     ctx.clearRect(0, 0, W, H);
-    setDecStatus('Синхронізація якорів...', '');
+    setDecStatus('Стабілізація геометрії трикутника...', '');
     return;
   }
 
@@ -387,27 +404,24 @@ function tryDecode(ctx, W, H) {
 
   const bottomAnchor = [pa, pb, pc].reduce((best, p) => p.y > best.y ? p : best);
   const baseSide = (dist(pa, pb) + dist(pb, pc) + dist(pa, pc)) / 3;
-  
-  // Базовий кут відліку (0 градусів)
   const currentRotation = Math.atan2(bottomAnchor.y - cy, bottomAnchor.x - cx);
 
   ctx.clearRect(0, 0, W, H);
 
-  ctx.strokeStyle = 'rgba(0, 120, 255, 0.4)';
+  // Напрямні лінії трикутника
+  ctx.strokeStyle = 'rgba(0, 150, 255, 0.35)';
   ctx.lineWidth = 1.5;
   ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.lineTo(pc.x, pc.y); ctx.closePath(); ctx.stroke();
 
-  const radarCircleR = baseSide * (120 / 310); 
-  const baseCircleR  = baseSide * (74 / 310); // Рівень вписаного кола (екватор)
+  const radarCircleR = baseSide * (116 / 310); 
+  const baseCircleR  = baseSide * (75 / 310); // Наше еталонне вписане коло
 
-  const bits = [];
-
-  // ЗЧИТУВАННЯ: Робимо постріл строго з кутовим зсувом на +15 градусів (в центр сектора)
-  const HALF_SECTOR = (30 * Math.PI) / 180; // 15 градусів у радіанах
+  let currentBitCode = 0;
+  const HALF_SECTOR = (15 * Math.PI) / 180; // Зсув на 15 градусів для пострілу в центр
 
   for (let i = 0; i < N_DATA; i++) {
     const angleFromStart = (i / N_DATA) * Math.PI * 2;
-    // Твій золотий зсув: центр сектора = початок сектора + 15 градусів
+    // Стріляємо строго посередині сектора!
     const globalAngle = currentRotation + angleFromStart + HALF_SECTOR;
 
     let foundDark = false;
@@ -428,35 +442,34 @@ function tryDecode(ctx, W, H) {
           foundDark = true;
           edgeX = px; edgeY = py;
           
-          // Порівняння: якщо радіус дотику більший за екватор — це 1, інакше — 0
-          bits.push(d > baseCircleR ? 1 : 0);
+          const bit = d > baseCircleR ? 1 : 0;
+          currentBitCode = (currentBitCode << 1) | bit;
           break;
         }
       }
     }
+    if (!foundDark) currentBitCode = (currentBitCode << 1) | 0;
 
-    if (!foundDark) bits.push(0);
-
-    // Малюємо дебаг-точки чітко по центру пелюсток
-    ctx.fillStyle = bits[bits.length - 1] === 1 ? '#ff3333' : '#33ff33';
+    // Малюємо дебаг-крапки радара на екрані
+    ctx.fillStyle = ((currentBitCode & 1) === 1) ? '#ff3333' : '#33ff33';
     ctx.beginPath(); ctx.arc(edgeX, edgeY, 4, 0, Math.PI * 2); ctx.fill();
   }
 
-  let id = 0;
-  for (let i = 0; i < 12; i++) id = (id << 1) | bits[i];
+  // ШУКАЄМО ЗЧИТАНИЙ БІТ-КОД У НАШІЙ БАЗІ З 574 ВАРІАНТІВ
+  const finalDbIndex = VALID_CODES.indexOf(currentBitCode);
 
-  const phrase = DB[id];
-  if (phrase) {
-    setDecStatus(`✓ КЛЯКСУ РОЗПІЗНАНО! ID: ${id}`, phrase);
-    if (lastLoggedId !== id) {
-      logMsg(`[SUCCESS] ID: ${id} -> "${phrase.substring(0,25)}..."`);
-      lastLoggedId = id;
+  if (finalDbIndex !== -1) {
+    const phrase = DB[finalDbIndex];
+    setDecStatus(`✓ ВЛУЧЕННЯ! Фраза #${finalDbIndex}`, phrase);
+    if (lastLoggedId !== finalDbIndex) {
+      logMsg(`[SUCCESS] Знайдено Індекс: ${finalDbIndex} (Код: ${currentBitCode}) -> "${phrase || 'Без тексту'}"`);
+      lastLoggedId = finalDbIndex;
     }
   } else {
-    setDecStatus(`Зчитано ID: ${id}`, '');
-    if (lastLoggedId !== id && id !== 0) {
-      logMsg(`[SCAN] Зміна контуру. Поточний ID: ${id}`);
-      lastLoggedId = id;
+    setDecStatus(`Пошук хвилі (код: ${currentBitCode})...`, '');
+    if (lastLoggedId !== currentBitCode && currentBitCode !== 0) {
+      logMsg(`[SCAN] Спроба розпізнати сирий код: ${currentBitCode}`);
+      lastLoggedId = currentBitCode;
     }
   }
 }
@@ -480,12 +493,7 @@ function logMsg(msg) {
 }
 
 function clearLog() { document.getElementById('logBody').textContent = ''; lastLoggedId = null; }
-
-function copyLog() {
-  navigator.clipboard.writeText(document.getElementById('logBody').textContent).then(() => {
-    alert('Лог скопійовано!');
-  });
-}
+function copyLog() { navigator.clipboard.writeText(document.getElementById('logBody').textContent).then(() => alert('Лог скопійовано!')); }
 
 function renderDB() {
   document.getElementById('dbList').innerHTML = Object.entries(DB)
@@ -502,7 +510,7 @@ function renderDB() {
 function addEntry() {
   const id = parseInt(document.getElementById('newId').value);
   const phrase = document.getElementById('newPhrase').value.trim();
-  if (isNaN(id)||id<0||id>4095||!phrase) return;
+  if (isNaN(id)||id<0||id>573||!phrase) return;
   DB[id] = phrase;
   document.getElementById('newId').value = '';
   document.getElementById('newPhrase').value = '';
@@ -512,9 +520,7 @@ function addEntry() {
 function deleteEntry(id) { delete DB[id]; renderDB(); }
 
 function switchTab(name) {
-  document.querySelectorAll('.tab').forEach((t,i) => {
-    t.classList.toggle('active', ['enc','dec','db'][i]===name);
-  });
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', ['enc','dec','db'][i]===name));
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
   if (name !== 'dec') stopCam();

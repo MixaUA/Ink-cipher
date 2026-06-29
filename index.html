@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Ink Cipher: Elegant 574 Wave</title>
+<title>Ink Cipher: Restored Solid Wave</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#f0ede4;font-family:Georgia,serif;min-height:100vh}
@@ -59,7 +59,7 @@ video{position:absolute;top:0;left:0;z-index:1}
 </head>
 <body>
 <h1>✦ Ink Cipher ✦</h1>
-<p class="subtitle">Чиста Елегантна Хвиля — База з 574 комбінацій (Індекс 0–573)</p>
+<p class="subtitle">Відновлена Стабільна Хвиля — Без брудних бризок (Індекс 0–573)</p>
 
 <div class="tabs">
   <div class="tab active" onclick="switchTab('enc')">Кодер</div>
@@ -122,7 +122,7 @@ let DB = {
   7: "Ліс дихає разом з тобою, варто лише зупинитись.",
   13: "Кожна крапля дощу несе своє таємне ім'я.",
   42: "Відповідь на всі питання Всесвіту знайшлася в кляксі!",
-  100: "Магія криється в деталях, які ніхто не помічає.",
+  100: "Магія криється v деталях, які ніхто не помічає.",
   573: "Остання сторінка чарівної книги секторних хвиль."
 };
 
@@ -155,68 +155,61 @@ function initValidCodes() {
 }
 initValidCodes();
 
-/* ── ОНОВЛЕНЕ МАЛЮВАННЯ: ЕЛЕГАНТНІ КРИВІ БЕЗЬЄ ТА ЧИСТА ФОРМА ── */
+/* ── ВІДНОВЛЕНА СТАБІЛЬНА ГЕОМЕТРІЯ 180 ТОЧОК ── */
 function drawHeroBody(ctx, bitCode) {
   const bits = [];
   for (let i = 11; i >= 0; i--) bits.push((bitCode >> i) & 1);
 
-  const baseCircleR = 68; // Стабільне вписане коло
-  const sectorAngleStep = (Math.PI * 2) / N_DATA;
-  const controlPoints = [];
+  const baseCircleR = 66; 
+  const totalPoints = 180;
+  const points = [];
 
-  // Зберігаємо опорні радіуси для центрів секторів із благородною амплітудою
-  for (let i = 0; i < N_DATA; i++) {
-    const amp = bits[i] === 1 ? 15 : -8; // Шляхетні коливання без перекосів
-    const r = baseCircleR + amp;
-    const a = START_ANGLE + i * sectorAngleStep;
-    controlPoints.push({
-      x: CX + Math.cos(a) * r,
-      y: CY + Math.sin(a) * r,
-      angle: a,
-      radius: r
+  for (let p = 0; p < totalPoints; p++) {
+    const angleFromStart = (p / totalPoints) * Math.PI * 2;
+    const globalAngle = START_ANGLE + angleFromStart;
+
+    const sectorFloat = (angleFromStart / (Math.PI * 2)) * N_DATA - 0.5;
+    const idx1 = (Math.floor(sectorFloat) + 12) % 12;
+    const idx2 = (idx1 + 1) % 12;
+    const t = sectorFloat - Math.floor(sectorFloat);
+
+    // Повертаємо залізобетонні перевірені амплітуди для чіткого сканування
+    const amp1 = bits[idx1] === 1 ? 22 : -12;
+    const amp2 = bits[idx2] === 1 ? 22 : -12;
+
+    const mu = (1 - Math.cos(t * Math.PI)) / 2;
+    const currentRadius = baseCircleR + (amp1 * (1 - mu) + amp2 * mu);
+
+    // Легкий органічний мікрошум по контуру без деформації великої геометрії
+    const organicNoise = Math.sin(angleFromStart * 6) * 1.5;
+
+    points.push({
+      x: CX + Math.cos(globalAngle) * (currentRadius + organicNoise),
+      y: CY + Math.sin(globalAngle) * (currentRadius + organicNoise)
     });
   }
 
   ctx.save();
   ctx.fillStyle = '#0a0a0a';
   ctx.beginPath();
-
-  // Починаємо з середини між останньою та першою точкою для безшовного кола
-  const pLast = controlPoints[N_DATA - 1];
-  const pFirst = controlPoints[0];
-  let midX = (pLast.x + pFirst.x) / 2;
-  let midY = (pLast.y + pFirst.y) / 2;
-  ctx.moveTo(midX, midY);
-
-  // Зв'язуємо точки плавними кривими Безьє через проміжні середні точки
-  for (let i = 0; i < N_DATA; i++) {
-    const pCurrent = controlPoints[i];
-    const pNext = controlPoints[(i + 1) % N_DATA];
-    
-    const nextMidX = (pCurrent.x + pNext.x) / 2;
-    const nextMidY = (pCurrent.y + pNext.y) / 2;
-
-    // Справжня плавна дуга Безьє без гострих заломів
-    ctx.quadraticCurveTo(pCurrent.x, pCurrent.y, nextMidX, nextMidY);
-  }
-
+  ctx.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < totalPoints; i++) ctx.lineTo(points[i].x, points[i].y);
   ctx.closePath();
   ctx.fill();
   ctx.restore();
 }
 
-function drawHeroEyes(ctx, bitCode) {
-  // Фіксовані очі без випадкового зсуву для чистоти стилю
+function drawHeroEyes(ctx) {
   ctx.save();
   const eyeSpacing = 11;
   const lx = CX - eyeSpacing, rx = CX + eyeSpacing;
   const ly = CY - 4, ry = CY - 4;
   ctx.fillStyle = '#f8f5ee';
-  ctx.beginPath(); ctx.arc(lx, ly, 5.5, 0, Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.arc(rx, ry, 5.5, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(lx, ly, 6, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(rx, ry, 6, 0, Math.PI*2); ctx.fill();
   ctx.fillStyle = '#0a0a0a';
-  ctx.beginPath(); ctx.arc(lx, ly, 2.5, 0, Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.arc(rx, ry, 2.5, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(lx, ly, 2.8, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(rx, ry, 2.8, 0, Math.PI*2); ctx.fill();
   ctx.restore();
 }
 
@@ -241,7 +234,7 @@ function drawSymbol(dbIndex) {
   ctx.fillRect(0, 0, W, H);
 
   drawHeroBody(ctx, bitCode);
-  drawHeroEyes(ctx, bitCode);
+  drawHeroEyes(ctx);
 
   const angles = [90, 210, 330].map(d => d * Math.PI / 180);
   for (const a of angles) {
@@ -265,7 +258,7 @@ function encode() {
 function downloadPNG() {
   const idx = document.getElementById('encId').value || '0';
   const a = document.createElement('a');
-  a.download = `ink-clean-wave-${idx}.png`;
+  a.download = `ink-restored-wave-${idx}.png`;
   a.href = document.getElementById('encCanvas').toDataURL('image/png');
   a.click();
 }
@@ -391,7 +384,7 @@ function tryDecode(ctx, W, H) {
   ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.lineTo(pc.x, pc.y); ctx.closePath(); ctx.stroke();
 
   const radarCircleR = baseSide * (116 / 310); 
-  const baseCircleR  = baseSide * (76 / 310); 
+  const baseCircleR  = baseSide * (75 / 310); // Еталонне вписане коло
 
   let currentBitCode = 0;
   const HALF_SECTOR = (15 * Math.PI) / 180;

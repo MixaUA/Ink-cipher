@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Ink Cipher: Sector Blob Edition</title>
+<title>Ink Cipher: Pure Sine Smooth Blob</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#f0ede4;font-family:Georgia,serif;min-height:100vh}
@@ -59,7 +59,7 @@ video{position:absolute;top:0;left:0;z-index:1}
 </head>
 <body>
 <h1>✦ Ink Cipher ✦</h1>
-<p class="subtitle">Жива Секторна Клякса — 12 біт (Художній Блоб)</p>
+<p class="subtitle">Синусоїдальна Клякса — 12 Біт (Обмежені Піки й Впадини)</p>
 
 <div class="tabs">
   <div class="tab active" onclick="switchTab('enc')">Кодер</div>
@@ -121,7 +121,7 @@ let DB = {
   0:"Початок усього — тиша перед першим словом.",
   1:"Зірки пам'ятають кожну дитячу мрію.",
   7:"Ліс дихає разом з тобою, варто лише зупинитись.",
-  13:"Кожна крапля дощу несе своє ім'я.",
+  13:"Кожна крапля дощу несе свое ім'я.",
   42:"Відповідь на всі питання — справді сорок два!",
   99:"За горизонтом живуть дракони і добрі велетні.",
   256:"Магія криється у звичайних числах.",
@@ -134,7 +134,7 @@ const ANCHOR_R = 155;
 const ANCHOR_SIZE = 14;
 const N_DATA = 12; 
 
-const START_ANGLE = Math.PI / 2; 
+const START_ANGLE = Math.PI / 2; // Лінія нижнього кута трикутника (0 градусів радара)
 let lastLoggedId = null;
 
 function mkRng(seed) {
@@ -142,80 +142,68 @@ function mkRng(seed) {
   return () => { s = Math.imul(1664525, s) + 1013904223 >>> 0; return s / 4294967296; };
 }
 
-/* ── Красиві округлі капілярні бризки навколо ── */
+/* ── Художні краплі на фоні ── */
 function drawOuterSplashes(ctx, rng) {
   ctx.save();
   ctx.fillStyle = '#0a0a0a';
-  for (let i = 0; i < 18; i++) {
+  for (let i = 0; i < 14; i++) {
     const a = rng() * Math.PI * 2;
-    const r = 112 + rng() * 32; 
-    ctx.globalAlpha = 0.25 + rng() * 0.4;
+    const r = 115 + rng() * 25; 
+    ctx.globalAlpha = 0.2 + rng() * 0.3;
     ctx.beginPath();
-    ctx.arc(CX + Math.cos(a)*r, CY + Math.sin(a)*r, 1.5 + rng()*3, 0, Math.PI*2);
+    ctx.arc(CX + Math.cos(a)*r, CY + Math.sin(a)*r, 1.5 + rng()*2, 0, Math.PI*2);
     ctx.fill();
   }
   ctx.restore();
 }
 
-/* ── Очі героя в центрі плями ── */
+/* ── Оченята ── */
 function drawHeroEyes(ctx, rng) {
   ctx.save();
-  const eyeSpacing = 12;
+  const eyeSpacing = 11;
   const eyeY = -4;
   const lx = CX - eyeSpacing, rx = CX + eyeSpacing;
   const ly = CY + eyeY, ry = CY + eyeY;
-  const eyeRadius = 6.5;
-
   ctx.fillStyle = '#f8f5ee';
-  ctx.beginPath(); ctx.arc(lx, ly, eyeRadius, 0, Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.arc(rx, ry, eyeRadius, 0, Math.PI*2); ctx.fill();
-
-  const lookX = (rng() - 0.5) * 2;
-  const lookY = (rng() - 0.5) * 1.5;
-
+  ctx.beginPath(); ctx.arc(lx, ly, 6, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(rx, ry, 6, 0, Math.PI*2); ctx.fill();
   ctx.fillStyle = '#0a0a0a';
-  ctx.beginPath(); ctx.arc(lx + lookX, ly + lookY, 3, 0, Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.arc(rx + lookX, ry + lookY, 3, 0, Math.PI*2); ctx.fill();
-
-  ctx.fillStyle = '#ffffff';
-  ctx.beginPath(); ctx.arc(lx + lookX - 1, ly + lookY - 1, 0.9, 0, Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.arc(rx + lookX - 1, ry + lookY - 1, 0.9, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(lx, ly, 2.8, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(rx, ry, 2.8, 0, Math.PI*2); ctx.fill();
   ctx.restore();
 }
 
-/* ── СЕКТОРНЕ ФОРМУВАННЯ СУЦІЛЬНОЇ КЛЯКСИ (БЛОБ) ── */
+/* ── ЧИСТА СИНУСОЇДАЛЬНА КЛЯКСА З ОБМЕЖЕНИМИ АМПЛІТУДАМИ ── */
 function drawHeroBody(ctx, id, rng) {
   const bits = [];
   for (let i = 11; i >= 0; i--) bits.push((id >> i) & 1);
 
-  const baseCircleR = 64; // Наше головне вписане базове коло (екватор)
-  const totalPoints = 120; // Кількість точок по колу для максимального згладжування
+  const baseCircleR = 66; // Вписане коло (наш нульовий рівень)
+  const totalPoints = 180; // Висока роздільна здатність для ідеальної гладкості
   const points = [];
 
   for (let p = 0; p < totalPoints; p++) {
     const angleFromStart = (p / totalPoints) * Math.PI * 2;
     const globalAngle = START_ANGLE + angleFromStart;
 
-    // Визначаємо поточний сектор з 12 можливих
+    // Математично визначаємо поточний сектор та його центр
     const sectorFloat = (angleFromStart / (Math.PI * 2)) * N_DATA;
-    const idx1 = Math.floor(sectorFloat) % N_DATA;
-    const idx2 = (idx1 + 1) % N_DATA;
-    const t = sectorFloat - Math.floor(sectorFloat);
+    const sectorIdx = Math.floor(sectorFloat) % N_DATA;
 
-    // Згладжування бітів сусідніх секторів для усунення гострих кутів "сонця"
-    const b1 = bits[idx1];
-    const b2 = bits[idx2];
+    // Синусоїдальний профіль сектора: максимальний вплив біта — строго по центру сектора
+    const bitValue = bits[sectorIdx];
     
-    // Плавна інтерполяція форми за допомогою косинусної кривої (cos інтерполяція)
-    const mu = (1 - Math.cos(t * Math.PI)) / 2;
-    const smoothBit = b1 * (1 - mu) + b2 * mu;
+    // Амплітуда: 1 = виступ (+20px), 0 = впадина (-12px)
+    const targetAmp = bitValue === 1 ? 20 : -12;
 
-    // Формуємо радіус: 1 = виступаюча жирна крапля, 0 = впадина
-    let r = baseCircleR + (smoothBit ? 28 : -14);
+    // Плавна синусоїда на базі кута всередині сектора
+    const sectorAngle = (sectorFloat - sectorIdx) * Math.PI; // від 0 до PI всередині сектора
+    let currentWave = Math.sin(sectorAngle) * targetAmp;
 
-    // Додаємо органічний випадковий шум, щоб пляма виглядала живою та ручною
-    r += Math.sin(angleFromStart * 6) * 4; 
-    r += Math.cos(angleFromStart * 12) * 2;
+    let r = baseCircleR + currentWave;
+
+    // Легкий, ледь помітний природний шум, щоб лінія не була стерильно комп'ютерною
+    r += Math.sin(angleFromStart * 8) * 2.5;
 
     points.push({
       x: CX + Math.cos(globalAngle) * r,
@@ -223,7 +211,6 @@ function drawHeroBody(ctx, id, rng) {
     });
   }
 
-  // Малюємо суцільну органічну масу
   ctx.save();
   ctx.fillStyle = '#0a0a0a';
   ctx.beginPath();
@@ -250,7 +237,7 @@ function drawAnchor(ctx, cx, cy) {
 function drawSymbol(id) {
   const canvas = document.getElementById('encCanvas');
   const ctx = canvas.getContext('2d');
-  const rng = mkRng(id ^ 0x99);
+  const rng = mkRng(id ^ 0xAA);
 
   ctx.clearRect(0, 0, W, H);
   ctx.fillStyle = '#f8f5ee';
@@ -279,12 +266,12 @@ function encode() {
 function downloadPNG() {
   const id = document.getElementById('encId').value || '0';
   const a = document.createElement('a');
-  a.download = `ink-sector-blob-${id}.png`;
+  a.download = `ink-sine-blob-${id}.png`;
   a.href = document.getElementById('encCanvas').toDataURL('image/png');
   a.click();
 }
 
-/* ── ОПТИМІЗОВАНИЙ СЕКТОРНИЙ ДЕКОДЕР ── */
+/* ── НАДІЙНИЙ ДЕКОДЕР З ЗСУВОМ НА 15 ГРАДУСІВ ── */
 let camStream = null, scanTimer = null;
 
 async function startCam() {
@@ -295,11 +282,11 @@ async function startCam() {
     });
     video.srcObject = camStream;
     document.getElementById('scanLine').style.display = 'block';
-    logMsg('Секторний радар запущено. Сканую форму...');
+    logMsg('Синусоїдальний радар активовано. Пошук центрів...');
     scanTimer = setInterval(scanFrame, 200);
   } catch(e) {
     document.getElementById('decStatus').className = 'status err';
-    document.getElementById('decStatus').textContent = 'Помилка камери: ' + e.message;
+    document.getElementById('decStatus').textContent = 'Камера недоступна: ' + e.message;
   }
 }
 
@@ -365,7 +352,7 @@ function tryDecode(ctx, W, H) {
   darkBlobs.sort((a, b) => b.size - a.size);
   if (darkBlobs.length < 3) {
     ctx.clearRect(0, 0, W, H);
-    setDecStatus('Пошук 3 якорів...', '');
+    setDecStatus('Очікування стабільного кадру...', '');
     return;
   }
 
@@ -390,7 +377,7 @@ function tryDecode(ctx, W, H) {
 
   if (!bestTriangle) {
     ctx.clearRect(0, 0, W, H);
-    setDecStatus('Стабілізація геометрії трикутника...', '');
+    setDecStatus('Синхронізація якорів...', '');
     return;
   }
 
@@ -400,35 +387,37 @@ function tryDecode(ctx, W, H) {
 
   const bottomAnchor = [pa, pb, pc].reduce((best, p) => p.y > best.y ? p : best);
   const baseSide = (dist(pa, pb) + dist(pb, pc) + dist(pa, pc)) / 3;
+  
+  // Базовий кут відліку (0 градусів)
   const currentRotation = Math.atan2(bottomAnchor.y - cy, bottomAnchor.x - cx);
 
   ctx.clearRect(0, 0, W, H);
 
-  // Малюємо рамку позиціонування
   ctx.strokeStyle = 'rgba(0, 120, 255, 0.4)';
   ctx.lineWidth = 1.5;
   ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.lineTo(pc.x, pc.y); ctx.closePath(); ctx.stroke();
 
-  // Радіуси нашої секторної системи
   const radarCircleR = baseSide * (120 / 310); 
-  const baseCircleR  = baseSide * (72 / 310); // Рівень вписаного кола
+  const baseCircleR  = baseSide * (74 / 310); // Рівень вписаного кола (екватор)
 
   const bits = [];
 
+  // ЗЧИТУВАННЯ: Робимо постріл строго з кутовим зсувом на +15 градусів (в центр сектора)
+  const HALF_SECTOR = (30 * Math.PI) / 180; // 15 градусів у радіанах
+
   for (let i = 0; i < N_DATA; i++) {
     const angleFromStart = (i / N_DATA) * Math.PI * 2;
-    const globalAngle = currentRotation + angleFromStart;
+    // Твій золотий зсув: центр сектора = початок сектора + 15 градусів
+    const globalAngle = currentRotation + angleFromStart + HALF_SECTOR;
 
     let foundDark = false;
     let edgeX = cx, edgeY = cy;
 
-    // Радар іде всередину від зовнішнього ліміту
     for (let d = radarCircleR; d >= 6; d -= 2) {
       const px = cx + Math.cos(globalAngle) * d;
       const py = cy + Math.sin(globalAngle) * d;
 
       if (lum(px, py) < THRESH * 1.05) {
-        // Захист від поодиноких шумів
         let dense = 0;
         if (lum(px+1, py) < THRESH * 1.05) dense++;
         if (lum(px-1, py) < THRESH * 1.05) dense++;
@@ -438,8 +427,8 @@ function tryDecode(ctx, W, H) {
         if (dense >= 2) {
           foundDark = true;
           edgeX = px; edgeY = py;
-
-          // Оцінка по вписаному колу: якщо вилізло за межі — 1, якщо ні — 0
+          
+          // Порівняння: якщо радіус дотику більший за екватор — це 1, інакше — 0
           bits.push(d > baseCircleR ? 1 : 0);
           break;
         }
@@ -448,7 +437,7 @@ function tryDecode(ctx, W, H) {
 
     if (!foundDark) bits.push(0);
 
-    // Візуалізація дебаг-точок (Червона = 1, Зелена = 0)
+    // Малюємо дебаг-точки чітко по центру пелюсток
     ctx.fillStyle = bits[bits.length - 1] === 1 ? '#ff3333' : '#33ff33';
     ctx.beginPath(); ctx.arc(edgeX, edgeY, 4, 0, Math.PI * 2); ctx.fill();
   }
@@ -464,9 +453,9 @@ function tryDecode(ctx, W, H) {
       lastLoggedId = id;
     }
   } else {
-    setDecStatus(`Зчитано ID Блоба: ${id}`, '');
+    setDecStatus(`Зчитано ID: ${id}`, '');
     if (lastLoggedId !== id && id !== 0) {
-      logMsg(`[SCAN] Виявлено контур ID: ${id}`);
+      logMsg(`[SCAN] Зміна контуру. Поточний ID: ${id}`);
       lastLoggedId = id;
     }
   }

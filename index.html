@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Ink Cipher: 574 Wave Blob</title>
+<title>Ink Cipher: Elegant 574 Wave</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#f0ede4;font-family:Georgia,serif;min-height:100vh}
@@ -59,7 +59,7 @@ video{position:absolute;top:0;left:0;z-index:1}
 </head>
 <body>
 <h1>✦ Ink Cipher ✦</h1>
-<p class="subtitle">Ідеальна Хвиля — База з 574 комбінацій (Індекс 0–573)</p>
+<p class="subtitle">Чиста Елегантна Хвиля — База з 574 комбінацій (Індекс 0–573)</p>
 
 <div class="tabs">
   <div class="tab active" onclick="switchTab('enc')">Кодер</div>
@@ -117,7 +117,6 @@ video{position:absolute;top:0;left:0;z-index:1}
 </div>
 
 <script>
-// Наша базова демонстраційна книга фраз тепер прив'язана до нових чистих індексів
 let DB = {
   0: "Початок усього — тиша перед першим словом.",
   7: "Ліс дихає разом з тобою, варто лише зупинитись.",
@@ -135,14 +134,12 @@ const START_ANGLE = Math.PI / 2;
 
 let lastLoggedId = null;
 
-// ГЕНЕРАЦІЯ 574 НАДІЙНИХ ХВИЛЯСТИХ КОМБІНАЦІЙ
 const VALID_CODES = [];
 function initValidCodes() {
   for (let code = 0; code < 4096; code++) {
     const bits = [];
     for (let i = 11; i >= 0; i--) bits.push((code >> i) & 1);
     
-    // Перевірка циклічного кола на наявність 3 однакових бітів підряд
     let hasTriple = false;
     for (let i = 0; i < 12; i++) {
       const b0 = bits[i];
@@ -153,88 +150,73 @@ function initValidCodes() {
         break;
       }
     }
-    if (!hasTriple) {
-      VALID_CODES.push(code);
-    }
+    if (!hasTriple) VALID_CODES.push(code);
   }
 }
-initValidCodes(); // Створюємо залізобетонну базу на старті
+initValidCodes();
 
-function mkRng(seed) {
-  let s = (seed ^ 0x5B6C7D8E) >>> 0;
-  return () => { s = Math.imul(1664525, s) + 1013904223 >>> 0; return s / 4294967296; };
-}
-
-function drawOuterSplashes(ctx, rng) {
-  ctx.save();
-  ctx.fillStyle = '#0a0a0a';
-  for (let i = 0; i < 12; i++) {
-    const a = rng() * Math.PI * 2;
-    const r = 110 + rng() * 25; 
-    ctx.globalAlpha = 0.2 + rng() * 0.3;
-    ctx.beginPath();
-    ctx.arc(CX + Math.cos(a)*r, CY + Math.sin(a)*r, 1.5 + rng()*2, 0, Math.PI*2);
-    ctx.fill();
-  }
-  ctx.restore();
-}
-
-function drawHeroEyes(ctx, rng) {
-  ctx.save();
-  const eyeSpacing = 11;
-  const lx = CX - eyeSpacing, rx = CX + eyeSpacing;
-  const ly = CY - 4, ry = CY - 4;
-  ctx.fillStyle = '#f8f5ee';
-  ctx.beginPath(); ctx.arc(lx, ly, 6, 0, Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.arc(rx, ry, 6, 0, Math.PI*2); ctx.fill();
-  ctx.fillStyle = '#0a0a0a';
-  ctx.beginPath(); ctx.arc(lx, ly, 2.8, 0, Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.arc(rx, ry, 2.8, 0, Math.PI*2); ctx.fill();
-  ctx.restore();
-}
-
-/* ── НОВА ЛОГІКА: ГЛАДКА ГЕНЕРАЦІЯ БЕЗ ГОСТРИХ КУТІВ ── */
-function drawHeroBody(ctx, bitCode, rng) {
+/* ── ОНОВЛЕНЕ МАЛЮВАННЯ: ЕЛЕГАНТНІ КРИВІ БЕЗЬЄ ТА ЧИСТА ФОРМА ── */
+function drawHeroBody(ctx, bitCode) {
   const bits = [];
   for (let i = 11; i >= 0; i--) bits.push((bitCode >> i) & 1);
 
-  const baseCircleR = 66; // Вписане коло
-  const totalPoints = 180;
-  const points = [];
+  const baseCircleR = 68; // Стабільне вписане коло
+  const sectorAngleStep = (Math.PI * 2) / N_DATA;
+  const controlPoints = [];
 
-  for (let p = 0; p < totalPoints; p++) {
-    const angleFromStart = (p / totalPoints) * Math.PI * 2;
-    const globalAngle = START_ANGLE + angleFromStart;
-
-    // Шукаємо два сусідні центри секторів для ідеально м'якої інтерполяції
-    const sectorFloat = (angleFromStart / (Math.PI * 2)) * N_DATA - 0.5;
-    const idx1 = (Math.floor(sectorFloat) + 12) % 12;
-    const idx2 = (idx1 + 1) % 12;
-    const t = sectorFloat - Math.floor(sectorFloat);
-
-    const amp1 = bits[idx1] === 1 ? 22 : -12;
-    const amp2 = bits[idx2] === 1 ? 22 : -12;
-
-    // Косинусна інтерполяція між центрами секторів — прибирає будь-які сходинки
-    const mu = (1 - Math.cos(t * Math.PI)) / 2;
-    const currentRadius = baseCircleR + (amp1 * (1 - mu) + amp2 * mu);
-
-    // Органічний живий контур
-    const organicNoise = Math.sin(angleFromStart * 6) * 2 + Math.cos(angleFromStart * 12) * 1;
-
-    points.push({
-      x: CX + Math.cos(globalAngle) * (currentRadius + organicNoise),
-      y: CY + Math.sin(globalAngle) * (currentRadius + organicNoise)
+  // Зберігаємо опорні радіуси для центрів секторів із благородною амплітудою
+  for (let i = 0; i < N_DATA; i++) {
+    const amp = bits[i] === 1 ? 15 : -8; // Шляхетні коливання без перекосів
+    const r = baseCircleR + amp;
+    const a = START_ANGLE + i * sectorAngleStep;
+    controlPoints.push({
+      x: CX + Math.cos(a) * r,
+      y: CY + Math.sin(a) * r,
+      angle: a,
+      radius: r
     });
   }
 
   ctx.save();
   ctx.fillStyle = '#0a0a0a';
   ctx.beginPath();
-  ctx.moveTo(points[0].x, points[0].y);
-  for (let i = 1; i < totalPoints; i++) ctx.lineTo(points[i].x, points[i].y);
+
+  // Починаємо з середини між останньою та першою точкою для безшовного кола
+  const pLast = controlPoints[N_DATA - 1];
+  const pFirst = controlPoints[0];
+  let midX = (pLast.x + pFirst.x) / 2;
+  let midY = (pLast.y + pFirst.y) / 2;
+  ctx.moveTo(midX, midY);
+
+  // Зв'язуємо точки плавними кривими Безьє через проміжні середні точки
+  for (let i = 0; i < N_DATA; i++) {
+    const pCurrent = controlPoints[i];
+    const pNext = controlPoints[(i + 1) % N_DATA];
+    
+    const nextMidX = (pCurrent.x + pNext.x) / 2;
+    const nextMidY = (pCurrent.y + pNext.y) / 2;
+
+    // Справжня плавна дуга Безьє без гострих заломів
+    ctx.quadraticCurveTo(pCurrent.x, pCurrent.y, nextMidX, nextMidY);
+  }
+
   ctx.closePath();
   ctx.fill();
+  ctx.restore();
+}
+
+function drawHeroEyes(ctx, bitCode) {
+  // Фіксовані очі без випадкового зсуву для чистоти стилю
+  ctx.save();
+  const eyeSpacing = 11;
+  const lx = CX - eyeSpacing, rx = CX + eyeSpacing;
+  const ly = CY - 4, ry = CY - 4;
+  ctx.fillStyle = '#f8f5ee';
+  ctx.beginPath(); ctx.arc(lx, ly, 5.5, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(rx, ry, 5.5, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#0a0a0a';
+  ctx.beginPath(); ctx.arc(lx, ly, 2.5, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(rx, ry, 2.5, 0, Math.PI*2); ctx.fill();
   ctx.restore();
 }
 
@@ -252,18 +234,14 @@ function drawAnchor(ctx, cx, cy) {
 function drawSymbol(dbIndex) {
   const canvas = document.getElementById('encCanvas');
   const ctx = canvas.getContext('2d');
-  
-  // Беремо реальний 12-бітний код із нашого списку 574 комбінацій
   const bitCode = VALID_CODES[dbIndex];
-  const rng = mkRng(bitCode);
 
   ctx.clearRect(0, 0, W, H);
   ctx.fillStyle = '#f8f5ee';
   ctx.fillRect(0, 0, W, H);
 
-  drawHeroBody(ctx, bitCode, rng);
-  drawHeroEyes(ctx, rng);
-  drawOuterSplashes(ctx, rng);
+  drawHeroBody(ctx, bitCode);
+  drawHeroEyes(ctx, bitCode);
 
   const angles = [90, 210, 330].map(d => d * Math.PI / 180);
   for (const a of angles) {
@@ -287,7 +265,7 @@ function encode() {
 function downloadPNG() {
   const idx = document.getElementById('encId').value || '0';
   const a = document.createElement('a');
-  a.download = `ink-wave-index-${idx}.png`;
+  a.download = `ink-clean-wave-${idx}.png`;
   a.href = document.getElementById('encCanvas').toDataURL('image/png');
   a.click();
 }
@@ -408,20 +386,18 @@ function tryDecode(ctx, W, H) {
 
   ctx.clearRect(0, 0, W, H);
 
-  // Напрямні лінії трикутника
   ctx.strokeStyle = 'rgba(0, 150, 255, 0.35)';
   ctx.lineWidth = 1.5;
   ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.lineTo(pc.x, pc.y); ctx.closePath(); ctx.stroke();
 
   const radarCircleR = baseSide * (116 / 310); 
-  const baseCircleR  = baseSide * (75 / 310); // Наше еталонне вписане коло
+  const baseCircleR  = baseSide * (76 / 310); 
 
   let currentBitCode = 0;
-  const HALF_SECTOR = (15 * Math.PI) / 180; // Зсув на 15 градусів для пострілу в центр
+  const HALF_SECTOR = (15 * Math.PI) / 180;
 
   for (let i = 0; i < N_DATA; i++) {
     const angleFromStart = (i / N_DATA) * Math.PI * 2;
-    // Стріляємо строго посередині сектора!
     const globalAngle = currentRotation + angleFromStart + HALF_SECTOR;
 
     let foundDark = false;
@@ -450,12 +426,10 @@ function tryDecode(ctx, W, H) {
     }
     if (!foundDark) currentBitCode = (currentBitCode << 1) | 0;
 
-    // Малюємо дебаг-крапки радара на екрані
     ctx.fillStyle = ((currentBitCode & 1) === 1) ? '#ff3333' : '#33ff33';
     ctx.beginPath(); ctx.arc(edgeX, edgeY, 4, 0, Math.PI * 2); ctx.fill();
   }
 
-  // ШУКАЄМО ЗЧИТАНИЙ БІТ-КОД У НАШІЙ БАЗІ З 574 ВАРІАНТІВ
   const finalDbIndex = VALID_CODES.indexOf(currentBitCode);
 
   if (finalDbIndex !== -1) {
